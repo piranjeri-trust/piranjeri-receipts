@@ -318,7 +318,8 @@ if selected is not None:
         )
         full_mobile = normalize_mobile(donor_mobile)
         whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
-        st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")---------------- HISTORY ----------------
+        st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")
+#---------------- HISTORY ----------------
 st.subheader("Receipt History")
 
 history = load_history()
