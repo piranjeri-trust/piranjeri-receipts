@@ -1,4 +1,3 @@
-
 from pathlib import Path
 from datetime import datetime
 import json
@@ -23,35 +22,22 @@ FONT_REG = "Helvetica"
 FONT_BOLD = "Helvetica-Bold"
 
 def ensure_counter(counter_path: Path):
-    if not counter_path.exists():
-        counter_path.write_text(json.dumps({"year": datetime.now().year, "last_serial": 0}, indent=2))
-
-def next_serial(counter_path: Path, issue_date: datetime) -> str:
-    ensure_counter(counter_path)
-    data = json.loads(counter_path.read_text())
-    year = issue_date.year
-    if data.get("year") != year:
-        data = {"year": year, "last_serial": 0}
-    data["last_serial"] += 1
-    counter_path.write_text(json.dumps(data, indent=2))
-    return f"{data['last_serial']:03d}"
-
-def parse_date(value):
-    if isinstance(value, datetime):
-        return value
-    dt = None
-    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d %m %Y", "%d-%m-%y"):
-        try:
-            dt = datetime.strptime(str(value), fmt)
-            break
-        except Exception:
-            pass
-    if dt is None:
-        dt = pd.to_datetime(value).to_pydatetime()
-    return dt
+    if counter_path and not counter_path.exists():
+        counter_path.write_text(json.dumps({"year": datetime.now().year, "count": 0}, indent=2))
 
 def format_date_dd_mm_yyyy(value):
-    dt = parse_date(value)
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        dt = None
+        for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d %m %Y", "%d-%m-%y"):
+            try:
+                dt = datetime.strptime(str(value), fmt)
+                break
+            except Exception:
+                pass
+        if dt is None:
+            dt = pd.to_datetime(value).to_pydatetime()
     return dt.strftime("%d %m %Y"), dt
 
 def dotted_line(c, x1, x2, y):
@@ -65,7 +51,6 @@ def fit_text(c, text, x_center, y, max_width, start_size, min_size=10, font_name
         size -= 0.5
     c.setFont(font_name, size)
     c.drawCentredString(x_center, y, text)
-    return size
 
 def draw_struck_option(c, x, y, text, strike=False, font_name=FONT_REG, size=14):
     c.setFont(font_name, size)
@@ -83,27 +68,27 @@ def generate_receipt_pdf(
     credit_date,
     issue_date=None,
     receipt_for="Temple Development / Daily Poojas / Festivities",
-    counter_path: Path = Path("serial_counter.json"),
+    counter_path: Path = None,
     om_image_path: Path | None = None,
     payment_method: str = "bank_transfer",
     cheque_number: str = "",
+    receipt_number_override: str | None = None,
 ):
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
+
     if issue_date is None:
         issue_date = datetime.now()
 
-    issue_date_str, issue_dt = format_date_dd_mm_yyyy(issue_date)
+    issue_date_str, _ = format_date_dd_mm_yyyy(issue_date)
     credit_date_str, _ = format_date_dd_mm_yyyy(credit_date)
-    serial = next_serial(counter_path, issue_dt)
+    receipt_number = receipt_number_override or "001/2026"
 
     payment_method = payment_method.lower().strip()
     if payment_method not in {"cash", "cheque", "bank_transfer"}:
         payment_method = "bank_transfer"
 
     c = canvas.Canvas(str(output_path), pagesize=(PAGE_W, PAGE_H))
-    c.setTitle(f"Receipt_{serial}_{donor_name}")
-    c.setAuthor(TRUST_NAME)
 
     left = 32
     right = PAGE_W - 32
@@ -133,7 +118,7 @@ def generate_receipt_pdf(
     row_y = top - 152
     c.setFont(FONT_REG, 12)
     c.drawString(left + 24, row_y, "No.")
-    c.drawString(left + 58, row_y, serial)
+    c.drawString(left + 58, row_y, receipt_number)
 
     c.drawString(right - 170, row_y, "Date :")
     dotted_line(c, right - 118, right - 20, row_y - 2)
@@ -176,7 +161,6 @@ def generate_receipt_pdf(
     c.drawString(amount_x + 4, y2 + 1, amount_words)
     c.setFillColor(BLUE)
 
-    # Payment method line
     c.setFont(FONT_REG, 14)
     c.drawString(label_x, y3, "by")
     x = label_x + c.stringWidth("by", FONT_REG, 14) + 12
@@ -189,25 +173,26 @@ def generate_receipt_pdf(
     x = draw_struck_option(c, x, y3, "Bank Transfer", strike=(payment_method != "bank_transfer"))
 
     if payment_method == "cheque":
-        ref_label = "Cheque No."
-        ref_value = cheque_number.strip()
-    elif payment_method == "bank_transfer":
-        ref_label = "Date of credit"
-        ref_value = credit_date_str
-    else:
-        ref_label = ""
-        ref_value = ""
-
-    if ref_label:
         ref_label_x = left + 500
         c.setFont(FONT_REG, 14)
-        c.drawString(ref_label_x, y3, ref_label)
-        ref_line_x1 = ref_label_x + c.stringWidth(ref_label, FONT_REG, 14) + 12
+        c.drawString(ref_label_x, y3, "Cheque No.")
+        ref_line_x1 = ref_label_x + c.stringWidth("Cheque No.", FONT_REG, 14) + 12
         ref_line_x2 = right - 38
         dotted_line(c, ref_line_x1, ref_line_x2, y3 - 3)
         c.setFillColor(BLACK)
         c.setFont(FONT_REG, 13)
-        c.drawString(ref_line_x1 + 4, y3 + 1, ref_value)
+        c.drawString(ref_line_x1 + 4, y3 + 1, cheque_number.strip())
+        c.setFillColor(BLUE)
+    elif payment_method == "bank_transfer":
+        ref_label_x = left + 500
+        c.setFont(FONT_REG, 14)
+        c.drawString(ref_label_x, y3, "Date of credit")
+        ref_line_x1 = ref_label_x + c.stringWidth("Date of credit", FONT_REG, 14) + 12
+        ref_line_x2 = right - 38
+        dotted_line(c, ref_line_x1, ref_line_x2, y3 - 3)
+        c.setFillColor(BLACK)
+        c.setFont(FONT_REG, 13)
+        c.drawString(ref_line_x1 + 4, y3 + 1, credit_date_str)
         c.setFillColor(BLUE)
 
     c.setFont(FONT_REG, 14)
@@ -242,5 +227,6 @@ def generate_receipt_pdf(
     c.setFillColor(BLACK)
     c.setFont(FONT_REG, 9)
     c.drawCentredString(mid, bottom + 5, "Computer generated receipt. No signature required.")
+
     c.save()
-    return {"receipt_number": serial, "issue_date": issue_date_str, "credit_date": credit_date_str}
+    return {"receipt_number": receipt_number}
