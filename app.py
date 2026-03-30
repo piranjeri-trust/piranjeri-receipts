@@ -263,7 +263,7 @@ if selected is not None:
     if payment_method == "cheque":
         cheque_number = st.text_input("Cheque number")
 
-        if st.button("Generate Receipt", type="primary"):
+    if st.button("Generate Receipt", type="primary"):
         final_purpose = custom_purpose.strip() if custom_purpose.strip() else purpose
         if optional_note.strip():
             final_purpose = f"{final_purpose} - {optional_note.strip()}"
@@ -318,7 +318,7 @@ if selected is not None:
         )
         full_mobile = normalize_mobile(donor_mobile)
         whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
-        st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")# ---------------- HISTORY ----------------
+        st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")---------------- HISTORY ----------------
 st.subheader("Receipt History")
 
 history = load_history()
