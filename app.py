@@ -1,21 +1,136 @@
-
-from pathlib import Path
-from datetime import datetime
-import pandas as pd
 import streamlit as st
+import pandas as pd
+from datetime import datetime, timedelta
+import json
+import os
 
-from receipt_core import generate_receipt_pdf
+# ---------------- LOGIN CONFIG ----------------
+USERS = {
+    "esrivasan": "Password1",
+    "pmk45in": "Password2",
+    "admin3": "Password3"
+}
 
-st.set_page_config(page_title="Piranjeri Temple Receipt Generator", layout="centered")
+SESSION_TIMEOUT = 15  # minutes
 
-BASE_DIR = Path(__file__).resolve().parent
-CSV_PATH = BASE_DIR / "donors.csv"
-OUT_DIR = BASE_DIR / "generated_receipts"
-COUNTER_PATH = BASE_DIR / "serial_counter.json"
-OM_PATH = BASE_DIR / "om_saffron.png"
-OUT_DIR.mkdir(exist_ok=True)
+# ---------------- FILES ----------------
+BASE_DIR = os.path.dirname(__file__)
+DONOR_FILE = os.path.join(BASE_DIR, "donors.csv")
+COUNTER_FILE = os.path.join(BASE_DIR, "serial_counter.json")
+HISTORY_FILE = os.path.join(BASE_DIR, "history.json")
 
-PURPOSES = [
+# ---------------- INIT FILES ----------------
+if not os.path.exists(HISTORY_FILE):
+    with open(HISTORY_FILE, "w") as f:
+        json.dump([], f)
+
+# ---------------- LOGIN ----------------
+def login():
+    st.title("🔐 Login")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if username in USERS and USERS[username] == password:
+            st.session_state["user"] = username
+            st.session_state["login_time"] = datetime.now()
+            st.success("Login successful")
+            st.rerun()
+        else:
+            st.error("Invalid credentials")
+
+def check_session():
+    if "login_time" in st.session_state:
+        if datetime.now() - st.session_state["login_time"] > timedelta(minutes=SESSION_TIMEOUT):
+            st.session_state.clear()
+            st.warning("Session expired. Login again.")
+            st.rerun()
+
+# ---------------- SERIAL ----------------
+def get_serial():
+    year = datetime.now().year
+
+    if not os.path.exists(COUNTER_FILE):
+        data = {"year": year, "count": 1}
+    else:
+        with open(COUNTER_FILE) as f:
+            data = json.load(f)
+
+        if data["year"] != year:
+            data = {"year": year, "count": 1}
+        else:
+            data["count"] += 1
+
+    with open(COUNTER_FILE, "w") as f:
+        json.dump(data, f)
+
+    return f"{data['count']:03d}/{year}"
+
+# ---------------- DONORS ----------------
+def load_donors():
+    return pd.read_csv(DONOR_FILE)
+
+def save_donors(df):
+    df.to_csv(DONOR_FILE, index=False)
+
+# ---------------- HISTORY ----------------
+def save_history(record):
+    with open(HISTORY_FILE, "r") as f:
+        data = json.load(f)
+
+    data.append(record)
+
+    with open(HISTORY_FILE, "w") as f:
+        json.dump(data, f)
+
+def load_history():
+    with open(HISTORY_FILE) as f:
+        return json.load(f)
+
+# ---------------- MAIN APP ----------------
+if "user" not in st.session_state:
+    login()
+    st.stop()
+
+check_session()
+
+st.title("Piranjeri Temple Receipt Generator")
+
+# ---------------- DONOR SEARCH ----------------
+donors = load_donors()
+
+query = st.text_input("Search donor")
+
+filtered = donors[
+    donors["NAME"].str.contains(query, case=False, na=False) |
+    donors["Mobile Number"].astype(str).str.contains(query, na=False)
+]
+
+selected = st.selectbox(
+    "Select donor",
+    filtered.apply(lambda x: f"{x['NAME']} - {x['Mobile Number']}", axis=1)
+)
+
+name, mobile = selected.split(" - ")
+
+# ---------------- ADD DONOR ----------------
+with st.expander("➕ Add New Donor"):
+    new_name = st.text_input("New donor name")
+    new_mobile = st.text_input("Mobile number")
+
+    if st.button("Add donor"):
+        if new_name and new_mobile:
+            donors.loc[len(donors)] = [new_name, new_mobile]
+            save_donors(donors)
+            st.success("Donor added. Refresh page.")
+        else:
+            st.error("Enter both fields")
+
+# ---------------- FORM ----------------
+amount = st.number_input("Amount", min_value=1.0)
+
+purpose = st.selectbox("Purpose", [
     "Nithya Pooja",
     "Garuda Seva",
     "Pradhosham",
@@ -24,95 +139,35 @@ PURPOSES = [
     "Annadhanam",
     "Kumbhabhishekam",
     "Varushabhishekam",
-    "Temple Renovation",
-]
+    "Temple Renovation"
+])
 
-st.title("Piranjeri Temple Receipt Generator")
-st.caption("Search donor by first 3 letters of name or by mobile number, then generate the receipt PDF.")
+payment = st.selectbox("Payment method", ["cash", "cheque", "bank transfer"])
 
-@st.cache_data
-def load_donors():
-    df = pd.read_csv(CSV_PATH)
-    df.columns = [c.strip() for c in df.columns]
-    df["NAME"] = df["NAME"].astype(str).str.strip()
-    df["Mobile Number"] = df["Mobile Number"].astype(str).str.strip()
-    return df
+note = st.text_input("Optional note")
 
-donors = load_donors()
+# ---------------- GENERATE ----------------
+if st.button("Generate Receipt"):
+    serial = get_serial()
 
-query = st.text_input("Type donor name or mobile number")
-matches = donors.copy()
-if query.strip():
-    q = query.strip().lower()
-    matches = donors[
-        donors["NAME"].str.lower().str.contains(q, na=False)
-        | donors["Mobile Number"].str.contains(q, na=False)
-    ]
+    record = {
+        "serial": serial,
+        "name": name,
+        "mobile": mobile,
+        "amount": amount,
+        "purpose": purpose,
+        "payment": payment,
+        "date": str(datetime.now())
+    }
 
-if len(matches) == 0:
-    st.warning("No donor found.")
-    st.stop()
+    save_history(record)
 
-display_options = [
-    f"{row['NAME']} — {row['Mobile Number']}"
-    for _, row in matches.head(20).iterrows()
-]
-selected = st.selectbox("Matching donors", display_options)
-selected_row = matches.head(20).iloc[display_options.index(selected)]
+    st.success(f"Receipt Generated: {serial}")
 
-donor_name = selected_row["NAME"]
-donor_mobile = str(selected_row["Mobile Number"])
+# ---------------- HISTORY ----------------
+st.subheader("📜 Receipt History")
 
-col1, col2 = st.columns(2)
-with col1:
-    amount = st.number_input("Amount received (Rs.)", min_value=1.0, step=1.0, format="%.2f")
-    credit_date = st.date_input("Date of credit into trust bank account", value=datetime.today())
-    payment_method = st.selectbox("Payment method", ["cash", "cheque", "bank_transfer"])
+history = load_history()
 
-with col2:
-    issue_date = st.date_input("Receipt issue date", value=datetime.today())
-    purpose = st.selectbox("Towards", PURPOSES)
-    optional_note = st.text_input("Optional note")
-
-cheque_number = ""
-if payment_method == "cheque":
-    cheque_number = st.text_input("Cheque number")
-
-if st.button("Generate receipt PDF", type="primary"):
-    safe_name = "".join(ch for ch in donor_name if ch.isalnum() or ch in (" ", "_", "-")).strip().replace(" ", "_")
-    out_file = OUT_DIR / f"receipt_{safe_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-
-    full_purpose = purpose if not optional_note.strip() else f"{purpose} - {optional_note.strip()}"
-
-    meta = generate_receipt_pdf(
-        output_path=out_file,
-        donor_name=donor_name,
-        donor_mobile=donor_mobile,
-        amount=float(amount),
-        credit_date=credit_date.strftime("%Y-%m-%d"),
-        issue_date=issue_date.strftime("%Y-%m-%d"),
-        receipt_for=full_purpose,
-        counter_path=COUNTER_PATH,
-        om_image_path=OM_PATH,
-        payment_method=payment_method,
-        cheque_number=cheque_number,
-    )
-
-    st.success(f"Receipt generated. Receipt No: {meta['receipt_number']}")
-    with open(out_file, "rb") as f:
-        st.download_button(
-            "Download PDF receipt",
-            data=f.read(),
-            file_name=out_file.name,
-            mime="application/pdf",
-        )
-
-    clean_phone = "".join(ch for ch in donor_mobile if ch.isdigit())
-    msg = (
-        f"Vanakkam {donor_name}, your donation receipt from Piranjeri Temples Family Trust "
-        f"(Receipt No. {meta['receipt_number']}) is ready. Please find the PDF attached."
-    )
-    whatsapp_url = f"https://wa.me/{clean_phone}?text=" + msg.replace(" ", "%20")
-    st.markdown(f"[Open WhatsApp chat with message]({whatsapp_url})")
-
-    st.info("Automatic WhatsApp attachment sending needs WhatsApp Business API setup.")
+for h in history[::-1]:
+    st.write(f"{h['serial']} | {h['name']} | Rs.{h['amount']} | {h['purpose']}")
