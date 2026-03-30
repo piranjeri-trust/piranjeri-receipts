@@ -82,6 +82,13 @@ def get_serial(issue_date: datetime):
 
     if data.get("year") != year:
         data = {"year": year, "count": 0}
+    else:
+        # support old file format
+        if "count" not in data:
+            if "last_serial" in data:
+                data["count"] = data["last_serial"]
+            else:
+                data["count"] = 0
 
     data["count"] += 1
 
@@ -89,7 +96,6 @@ def get_serial(issue_date: datetime):
         json.dump(data, f)
 
     return f"{data['count']:03d}/{year}"
-
 # ---------------- DONORS ----------------
 def ensure_donor_file():
     if not DONOR_FILE.exists():
