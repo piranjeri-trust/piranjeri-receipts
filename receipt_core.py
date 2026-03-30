@@ -8,7 +8,7 @@ from reportlab.lib.utils import ImageReader
 
 TRUST_NAME = "PIRANJERI TEMPLES FAMILY TRUST"
 REGISTERED_ADDRESS = "26A, Lake View Main Road, Madipakkam, Chennai - 600 091."
-EMAIL_LINE = "E-mail : pmk45in@yahoo.co.in / esivasan@gmail.com"
+EMAIL_LINE = "E-mail : pmk45in@yahoo.co.in / esrivasan@gmail.com"
 HELPER_LINE = "Sri Prasanna Venkatachalapathy Sahayam"
 PHONE_LINE = "Ph : 044-22471339"
 
