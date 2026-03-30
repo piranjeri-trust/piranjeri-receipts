@@ -333,13 +333,44 @@ for i, h in enumerate(history[::-1]):
         )
 
     with col2:
+       st.subheader("Receipt History")
+
+history = load_history()
+
+for i, h in enumerate(history[::-1]):
+    col1, col2 = st.columns([5, 1])
+
+    with col1:
+        st.write(
+            f"{h['serial']} | {h['name']} | Rs.{h['amount']} | {h['purpose']}"
+        )
+
+    with col2:
         if st.button("Reprint", key=f"reprint_{i}"):
+            out_file = OUT_DIR / h["pdf_file"]
+
             generate_receipt_pdf(
-                name=h["name"],
-                amount=h["amount"],
-                purpose=h["purpose"],
-                payment=h["payment"],
-                serial=h["serial"],   # 👈 SAME NUMBER
-                issue_date=h["date"]
+                output_path=out_file,
+                donor_name=h["name"],
+                donor_mobile=h["mobile"],
+                amount=float(h["amount"]),
+                credit_date=h["credit_date"],
+                issue_date=h["issue_date"],
+                receipt_for=h["purpose"],
+                counter_path=COUNTER_FILE,
+                om_image_path=OM_PATH,
+                payment_method=h["payment"],
+                cheque_number=h.get("cheque_number", ""),
+                receipt_number_override=h["serial"],
             )
+
             st.success(f"Reprinted receipt {h['serial']}")
+
+            with open(out_file, "rb") as f:
+                st.download_button(
+                    f"Download {h['serial']}",
+                    f.read(),
+                    file_name=out_file.name,
+                    mime="application/pdf",
+                    key=f"download_reprint_{i}"
+                )
