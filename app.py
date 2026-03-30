@@ -37,7 +37,14 @@ PURPOSES = [
     "Temple Renovation",
     "General Donation"
 ]
-
+COUNTRY_CODES = {
+    "India (+91)": "91",
+    "Singapore (+65)": "65",
+    "Malaysia (+60)": "60",
+    "UAE (+971)": "971",
+    "UK (+44)": "44",
+    "USA (+1)": "1"
+}
 # ---------------- INIT FILES ----------------
 if not HISTORY_FILE.exists():
     HISTORY_FILE.write_text("[]", encoding="utf-8")
@@ -175,13 +182,15 @@ else:
 # ---------------- ADD DONOR ----------------
 with st.expander("Add New Donor"):
     new_name = st.text_input("New donor name")
-    new_mobile = st.text_input("New donor mobile number")
+    new_country = st.selectbox("Country code", list(COUNTRY_CODES.keys()), key="add_country")
+    new_mobile = st.text_input("New donor mobile number (without country code)")
 
     if st.button("Save New Donor"):
         nm = new_name.strip()
-        mm = normalize_mobile(new_mobile)
+        raw_mobile = normalize_mobile(new_mobile)
+        mm = COUNTRY_CODES[new_country] + raw_mobile
 
-        if not nm or not mm:
+        if not nm or not raw_mobile:
             st.error("Enter both donor name and mobile number.")
         else:
             duplicate = donors[
@@ -195,21 +204,36 @@ with st.expander("Add New Donor"):
                 save_donors(donors)
                 st.success("New donor added. Refresh search if needed.")
                 st.rerun()
-
 # ---------------- EDIT DONOR ----------------
 if selected is not None:
     with st.expander("Edit Selected Donor"):
         current_name = donors.loc[selected_index, "NAME"]
-        current_mobile = donors.loc[selected_index, "Mobile Number"]
+        current_mobile = str(donors.loc[selected_index, "Mobile Number"])
+
+        default_country = "India (+91)"
+        default_local = current_mobile
+
+        for label, code in COUNTRY_CODES.items():
+            if current_mobile.startswith(code):
+                default_country = label
+                default_local = current_mobile[len(code):]
+                break
 
         edit_name = st.text_input("Edit donor name", value=current_name)
-        edit_mobile = st.text_input("Edit donor mobile number", value=current_mobile)
+        edit_country = st.selectbox(
+            "Edit country code",
+            list(COUNTRY_CODES.keys()),
+            index=list(COUNTRY_CODES.keys()).index(default_country),
+            key="edit_country"
+        )
+        edit_mobile = st.text_input("Edit donor mobile number (without country code)", value=default_local)
 
         if st.button("Update Donor"):
             en = edit_name.strip()
-            em = normalize_mobile(edit_mobile)
+            raw_mobile = normalize_mobile(edit_mobile)
+            em = COUNTRY_CODES[edit_country] + raw_mobile
 
-            if not en or not em:
+            if not en or not raw_mobile:
                 st.error("Name and mobile number cannot be empty.")
             else:
                 donors.loc[selected_index, "NAME"] = en
@@ -217,7 +241,6 @@ if selected is not None:
                 save_donors(donors)
                 st.success("Donor updated successfully.")
                 st.rerun()
-
 # ---------------- RECEIPT FORM ----------------
 if selected is not None:
     donor_name = donors.loc[selected_index, "NAME"]
@@ -293,8 +316,8 @@ if selected is not None:
             f"Vanakkam {donor_name}, your donation receipt "
             f"({receipt_number}) from Piranjeri Temples Family Trust is ready."
         )
-        whatsapp_url = f"https://wa.me/{normalize_mobile(donor_mobile)}?text={whatsapp_text.replace(' ', '%20')}"
-        st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")
+       full_mobile = normalize_mobile(donor_mobile)
+whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
 
 # ---------------- HISTORY ----------------
 st.subheader("Receipt History")
