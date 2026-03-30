@@ -304,7 +304,7 @@ if selected is not None:
 
         st.success(f"Receipt generated: {receipt_number}")
 
-        with open(out_file, "rb") as f:
+                with open(out_file, "rb") as f:
             st.download_button(
                 "Download PDF",
                 f.read(),
@@ -316,9 +316,9 @@ if selected is not None:
             f"Vanakkam {donor_name}, your donation receipt "
             f"({receipt_number}) from Piranjeri Temples Family Trust is ready."
         )
-       full_mobile = normalize_mobile(donor_mobile)
-whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
-
+        full_mobile = normalize_mobile(donor_mobile)
+        whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
+        st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")
 # ---------------- HISTORY ----------------
 st.subheader("Receipt History")
 
