@@ -323,11 +323,23 @@ if selected is not None:
 st.subheader("Receipt History")
 
 history = load_history()
-if history:
-    for h in history[::-1]:
+
+for i, h in enumerate(history[::-1]):
+    col1, col2 = st.columns([4,1])
+
+    with col1:
         st.write(
-            f"{h['serial']} | {h['name']} | Rs.{h['amount']:.2f} | "
-            f"{h['purpose']} | {h['payment']} | {h.get('user', '')}"
+            f"{h['serial']} | {h['name']} | Rs.{h['amount']} | {h['purpose']}"
         )
-else:
-    st.info("No receipts generated yet.")
+
+    with col2:
+        if st.button("Reprint", key=f"reprint_{i}"):
+            generate_receipt_pdf(
+                name=h["name"],
+                amount=h["amount"],
+                purpose=h["purpose"],
+                payment=h["payment"],
+                serial=h["serial"],   # 👈 SAME NUMBER
+                issue_date=h["date"]
+            )
+            st.success(f"Reprinted receipt {h['serial']}")
