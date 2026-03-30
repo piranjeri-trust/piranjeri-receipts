@@ -320,57 +320,95 @@ if selected is not None:
         whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
         st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")
 #---------------- HISTORY ----------------
+# ---------------- RECEIPT HISTORY ----------------
 st.subheader("Receipt History")
 
 history = load_history()
 
-for i, h in enumerate(history[::-1]):
-    col1, col2 = st.columns([4,1])
-
-    with col1:
+if not history:
+    st.info("No receipts generated yet.")
+else:
+    for h in history[::-1]:
         st.write(
-            f"{h['serial']} | {h['name']} | Rs.{h['amount']} | {h['purpose']}"
+            f"{h['serial']} | {h['name']} | Rs.{h['amount']} | "
+            f"{h['purpose']} | {h['payment']} | {h.get('user', '')}"
         )
 
-    with col2:
-       st.subheader("Receipt History")
+# ---------------- REPRINT SEARCH ----------------
+st.subheader("Reprint Receipt")
 
-history = load_history()
+search_col1, search_col2, search_col3 = st.columns(3)
 
-for i, h in enumerate(history[::-1]):
-    col1, col2 = st.columns([5, 1])
+with search_col1:
+    search_receipt_no = st.text_input("Search by Receipt Number")
 
-    with col1:
-        st.write(
-            f"{h['serial']} | {h['name']} | Rs.{h['amount']} | {h['purpose']}"
-        )
+with search_col2:
+    search_mobile = st.text_input("Search by Mobile Number")
 
-    with col2:
-        if st.button("Reprint", key=f"reprint_{i}"):
-            out_file = OUT_DIR / h["pdf_file"]
+with search_col3:
+    search_issue_date = st.date_input("Search by Issue Date", value=None)
 
-            generate_receipt_pdf(
-                output_path=out_file,
-                donor_name=h["name"],
-                donor_mobile=h["mobile"],
-                amount=float(h["amount"]),
-                credit_date=h["credit_date"],
-                issue_date=h["issue_date"],
-                receipt_for=h["purpose"],
-                counter_path=COUNTER_FILE,
-                om_image_path=OM_PATH,
-                payment_method=h["payment"],
-                cheque_number=h.get("cheque_number", ""),
-                receipt_number_override=h["serial"],
-            )
+filtered_history = history
 
-            st.success(f"Reprinted receipt {h['serial']}")
+if search_receipt_no.strip():
+    filtered_history = [
+        h for h in filtered_history
+        if search_receipt_no.strip().lower() in str(h.get("serial", "")).lower()
+    ]
 
-            with open(out_file, "rb") as f:
-                st.download_button(
-                    f"Download {h['serial']}",
-                    f.read(),
-                    file_name=out_file.name,
-                    mime="application/pdf",
-                    key=f"download_reprint_{i}"
+if search_mobile.strip():
+    mobile_q = normalize_mobile(search_mobile)
+    filtered_history = [
+        h for h in filtered_history
+        if mobile_q in normalize_mobile(str(h.get("mobile", "")))
+    ]
+
+if search_issue_date:
+    issue_q = search_issue_date.strftime("%Y-%m-%d")
+    filtered_history = [
+        h for h in filtered_history
+        if str(h.get("issue_date", "")) == issue_q
+    ]
+
+if search_receipt_no.strip() or search_mobile.strip() or search_issue_date:
+    if filtered_history:
+        for i, h in enumerate(filtered_history[::-1]):
+            col1, col2 = st.columns([5, 1])
+
+            with col1:
+                st.write(
+                    f"{h['serial']} | {h['name']} | Rs.{h['amount']} | "
+                    f"{h['purpose']} | {h['payment']}"
                 )
+
+            with col2:
+                if st.button("Reprint", key=f"reprint_{i}_{h['serial']}"):
+                    out_file = OUT_DIR / h["pdf_file"]
+
+                    generate_receipt_pdf(
+                        output_path=out_file,
+                        donor_name=h["name"],
+                        donor_mobile=h["mobile"],
+                        amount=float(h["amount"]),
+                        credit_date=h["credit_date"],
+                        issue_date=h["issue_date"],
+                        receipt_for=h["purpose"],
+                        counter_path=COUNTER_FILE,
+                        om_image_path=OM_PATH,
+                        payment_method=h["payment"],
+                        cheque_number=h.get("cheque_number", ""),
+                        receipt_number_override=h["serial"],
+                    )
+
+                    st.success(f"Reprinted receipt {h['serial']}")
+
+                    with open(out_file, "rb") as f:
+                        st.download_button(
+                            f"Download {h['serial']}",
+                            f.read(),
+                            file_name=out_file.name,
+                            mime="application/pdf",
+                            key=f"download_reprint_{i}_{h['serial']}"
+                        )
+    else:
+        st.warning("No matching receipt found.")
