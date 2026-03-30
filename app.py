@@ -346,8 +346,10 @@ with search_col2:
     search_mobile = st.text_input("Search by Mobile Number")
 
 with search_col3:
-    search_issue_date = st.date_input("Search by Issue Date", value=None)
-
+    search_issue_date_enabled = st.checkbox("Filter by Issue Date")
+    search_issue_date = None
+    if search_issue_date_enabled:
+      search_issue_date = st.date_input("Select Issue Date", value=datetime.today())
 filtered_history = history
 
 if search_receipt_no.strip():
@@ -370,7 +372,7 @@ if search_issue_date:
         if str(h.get("issue_date", "")) == issue_q
     ]
 
-if search_receipt_no.strip() or search_mobile.strip() or search_issue_date:
+if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabled:
     if filtered_history:
         for i, h in enumerate(filtered_history[::-1]):
             col1, col2 = st.columns([5, 1])
