@@ -1,0 +1,5 @@
+streamlit
+pandas
+reportlab
+google-api-python-client
+google-auth
