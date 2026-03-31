@@ -22,7 +22,7 @@ def get_sheets_client():
 def log_to_sheets(record: dict):
     """Append one receipt record as a row in Google Sheet."""
     client = get_sheets_client()
-    spreadsheet_id = st.secrets["google_drive"]["spreadsheet_id"]
+    spreadsheet_id = st.secrets["google_sheets"]["spreadsheet_id"]
     sheet = client.open_by_key(spreadsheet_id).sheet1
 
     # Write headers if sheet is empty
