@@ -300,7 +300,7 @@ if selected is not None:
             "credit_date": credit_date.strftime("%Y-%m-%d"),
             "user": st.session_state["user"],
             "pdf_file": str(out_file.name),
-            "created_at": datetime.now().isoformat()
+            "created_at": datetime.now().isoformat(),
 
             "drive_file_id": drive_file_id,
             "drive_link": drive_link,
