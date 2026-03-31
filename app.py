@@ -256,7 +256,7 @@ if selected is not None:
     with col2:
         issue_date = st.date_input("Receipt issue date", value=datetime.today())
         purpose = st.selectbox("Purpose", PURPOSES)
-        custom_purpose = st.text_input("Custom purpose (optional)")
+       
         optional_note = st.text_input("Optional note")
 
     cheque_number = ""
@@ -264,7 +264,7 @@ if selected is not None:
         cheque_number = st.text_input("Cheque number")
 
     if st.button("Generate Receipt", type="primary"):
-        final_purpose = custom_purpose.strip() if custom_purpose.strip() else purpose
+        final_purpose = purpose
         if optional_note.strip():
             final_purpose = f"{final_purpose} - {optional_note.strip()}"
 
