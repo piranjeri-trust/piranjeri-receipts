@@ -288,8 +288,7 @@ if selected is not None:
             receipt_number_override=receipt_number,
         )
         drive_file_id, drive_link = upload_to_drive(str(out_file), Path(out_file).name)
-            "drive_file_id": drive_file_id,
-            "drive_link": drive_link,
+            
         record = {
             "serial": receipt_number,
             "name": donor_name,
@@ -302,6 +301,9 @@ if selected is not None:
             "user": st.session_state["user"],
             "pdf_file": str(out_file.name),
             "created_at": datetime.now().isoformat()
+
+            "drive_file_id": drive_file_id,
+            "drive_link": drive_link,
         }
         save_history(record)
 
