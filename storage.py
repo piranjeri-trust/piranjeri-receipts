@@ -31,10 +31,3 @@ def log_to_sheets(record: dict):
         sheet.append_row(list(record.keys()))
 
     sheet.append_row(list(record.values()))
-```
-
----
-
-### 3. Add to `requirements.txt`
-```
-gspread
