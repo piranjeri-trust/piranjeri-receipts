@@ -290,42 +290,41 @@ if selected is not None:
             cheque_number=cheque_number,
             receipt_number_override=receipt_number,
         )
-        
-record = {
-    "serial": receipt_number,
-    "name": donor_name,
-    "mobile": donor_mobile,
-    "amount": float(amount),
-    "purpose": final_purpose,
-    "payment": payment_method,
-    "issue_date": issue_date.strftime("%Y-%m-%d"),
-    "credit_date": credit_date.strftime("%Y-%m-%d"),
-    "user": st.session_state["user"],
-    "pdf_file": str(out_file.name),
-    "created_at": datetime.now().isoformat(),
-}
-save_history(record)
-log_to_sheets(record)
+
+        record = {
+            "serial": receipt_number,
+            "name": donor_name,
+            "mobile": donor_mobile,
+            "amount": float(amount),
+            "purpose": final_purpose,
+            "payment": payment_method,
+            "issue_date": issue_date.strftime("%Y-%m-%d"),
+            "credit_date": credit_date.strftime("%Y-%m-%d"),
+            "user": st.session_state["user"],
+            "pdf_file": str(out_file.name),
+            "created_at": datetime.now().isoformat(),
+        }
+        save_history(record)
+        log_to_sheets(record)
+
         st.success(f"Receipt generated: {receipt_number}")
-       
+        st.success("✅ Receipt logged to Google Sheets.")
 
-st.success("✅ Receipt logged to Google Sheets.")
-st.success("✅ Receipt logged to Google Sheets.")
-with open(out_file, "rb") as f:
-                st.download_button(
-                    "Download PDF",
-                    f.read(),
-                    file_name=out_file.name,
-                    mime="application/pdf"
-                )
-
-            whatsapp_text = (
-                f"Vanakkam {donor_name}, your donation receipt "
-                f"({receipt_number}) from Piranjeri Temples Family Trust is ready."
+        with open(out_file, "rb") as f:
+            st.download_button(
+                "Download PDF",
+                f.read(),
+                file_name=out_file.name,
+                mime="application/pdf"
             )
-            full_mobile = normalize_mobile(donor_mobile)
-            whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
-            st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")       
+
+        whatsapp_text = (
+            f"Vanakkam {donor_name}, your donation receipt "
+            f"({receipt_number}) from Piranjeri Temples Family Trust is ready."
+        )
+        full_mobile = normalize_mobile(donor_mobile)
+        whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
+        st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")
 #---------------- HISTORY ----------------
 # ---------------- RECEIPT HISTORY ----------------
 st.subheader("Receipt History")
