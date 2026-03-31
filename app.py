@@ -1,6 +1,3 @@
-# REMOVE this:
-from storage import log_to_sheets
-# REPLACE with:
 from storage import log_to_sheets
 import streamlit as st
 import pandas as pd
