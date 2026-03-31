@@ -287,7 +287,9 @@ if selected is not None:
             cheque_number=cheque_number,
             receipt_number_override=receipt_number,
         )
-
+        drive_file_id, drive_link = upload_to_drive(str(out_file), Path(out_file).name)
+            "drive_file_id": drive_file_id,
+            "drive_link": drive_link,
         record = {
             "serial": receipt_number,
             "name": donor_name,
@@ -304,6 +306,9 @@ if selected is not None:
         save_history(record)
 
         st.success(f"Receipt generated: {receipt_number}")
+        where to add          st.success("Saved to Google Drive")
+        if drive_link:
+            st.markdown(f"[Open in Google Drive]({drive_link})")
 
         with open(out_file, "rb") as f:
             st.download_button(
