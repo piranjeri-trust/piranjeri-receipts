@@ -3,7 +3,7 @@ from googleapiclient.http import MediaFileUpload
 from google.oauth2.service_account import Credentials
 import streamlit as st
 
-SCOPES = ["https://www.googleapis.com/auth/drive.file"]
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 def upload_to_drive(file_path, file_name):
     creds_info = {
