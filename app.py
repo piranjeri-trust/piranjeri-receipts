@@ -308,7 +308,7 @@ if selected is not None:
         save_history(record)
 
         st.success(f"Receipt generated: {receipt_number}")
-           st.success("Saved to Google Drive")
+        st.success("Saved to Google Drive")
         if drive_link:
             st.markdown(f"[Open in Google Drive]({drive_link})")
 
