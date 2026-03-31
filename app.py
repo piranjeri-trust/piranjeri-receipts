@@ -1,4 +1,7 @@
+# REMOVE this:
 from storage import upload_to_drive
+# REPLACE with:
+from storage import log_to_sheets
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -287,30 +290,26 @@ if selected is not None:
             cheque_number=cheque_number,
             receipt_number_override=receipt_number,
         )
-        drive_file_id, drive_link = upload_to_drive(str(out_file), Path(out_file).name)
-            
-        record = {
-            "serial": receipt_number,
-            "name": donor_name,
-            "mobile": donor_mobile,
-            "amount": float(amount),
-            "purpose": final_purpose,
-            "payment": payment_method,
-            "issue_date": issue_date.strftime("%Y-%m-%d"),
-            "credit_date": credit_date.strftime("%Y-%m-%d"),
-            "user": st.session_state["user"],
-            "pdf_file": str(out_file.name),
-            "created_at": datetime.now().isoformat(),
-
-            "drive_file_id": drive_file_id,
-            "drive_link": drive_link,
-        }
+        
+record = {
+    "serial": receipt_number,
+    "name": donor_name,
+    "mobile": donor_mobile,
+    "amount": float(amount),
+    "purpose": final_purpose,
+    "payment": payment_method,
+    "issue_date": issue_date.strftime("%Y-%m-%d"),
+    "credit_date": credit_date.strftime("%Y-%m-%d"),
+    "user": st.session_state["user"],
+    "pdf_file": str(out_file.name),
+    "created_at": datetime.now().isoformat(),
+}
         save_history(record)
 
         st.success(f"Receipt generated: {receipt_number}")
-        st.success("Saved to Google Drive")
-        if drive_link:
-            st.markdown(f"[Open in Google Drive]({drive_link})")
+       
+log_to_sheets(record)
+st.success("✅ Receipt logged to Google Sheets.")
 
         with open(out_file, "rb") as f:
             st.download_button(
