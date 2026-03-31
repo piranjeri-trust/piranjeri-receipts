@@ -304,28 +304,28 @@ record = {
     "pdf_file": str(out_file.name),
     "created_at": datetime.now().isoformat(),
 }
-        save_history(record)
-
+save_history(record)
+log_to_sheets(record)
         st.success(f"Receipt generated: {receipt_number}")
        
-log_to_sheets(record)
+
 st.success("✅ Receipt logged to Google Sheets.")
+st.success("✅ Receipt logged to Google Sheets.")
+with open(out_file, "rb") as f:
+                st.download_button(
+                    "Download PDF",
+                    f.read(),
+                    file_name=out_file.name,
+                    mime="application/pdf"
+                )
 
-        with open(out_file, "rb") as f:
-            st.download_button(
-                "Download PDF",
-                f.read(),
-                file_name=out_file.name,
-                mime="application/pdf"
+            whatsapp_text = (
+                f"Vanakkam {donor_name}, your donation receipt "
+                f"({receipt_number}) from Piranjeri Temples Family Trust is ready."
             )
-
-        whatsapp_text = (
-            f"Vanakkam {donor_name}, your donation receipt "
-            f"({receipt_number}) from Piranjeri Temples Family Trust is ready."
-        )
-        full_mobile = normalize_mobile(donor_mobile)
-        whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
-        st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")
+            full_mobile = normalize_mobile(donor_mobile)
+            whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
+            st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")       
 #---------------- HISTORY ----------------
 # ---------------- RECEIPT HISTORY ----------------
 st.subheader("Receipt History")
