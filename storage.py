@@ -1,11 +1,12 @@
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
+import gspread
 from google.oauth2.service_account import Credentials
 import streamlit as st
 
-SCOPES = ["https://www.googleapis.com/auth/drive"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets",
+]
 
-def upload_to_drive(file_path, file_name):
+def get_sheets_client():
     creds_info = {
         "type": st.secrets["google_drive"]["type"],
         "project_id": st.secrets["google_drive"]["project_id"],
@@ -15,21 +16,25 @@ def upload_to_drive(file_path, file_name):
         "client_id": st.secrets["google_drive"]["client_id"],
         "token_uri": "https://oauth2.googleapis.com/token",
     }
-
     creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-    service = build("drive", "v3", credentials=creds)
+    return gspread.authorize(creds)
 
-    file_metadata = {
-        "name": file_name,
-        "parents": [st.secrets["google_drive"]["folder_id"]],
-    }
+def log_to_sheets(record: dict):
+    """Append one receipt record as a row in Google Sheet."""
+    client = get_sheets_client()
+    spreadsheet_id = st.secrets["google_drive"]["spreadsheet_id"]
+    sheet = client.open_by_key(spreadsheet_id).sheet1
 
-    media = MediaFileUpload(file_path, mimetype="application/pdf")
+    # Write headers if sheet is empty
+    existing = sheet.get_all_values()
+    if not existing:
+        sheet.append_row(list(record.keys()))
 
-    uploaded = service.files().create(
-        body=file_metadata,
-        media_body=media,
-        fields="id, webViewLink"
-    ).execute()
+    sheet.append_row(list(record.values()))
+```
 
-    return uploaded["id"], uploaded.get("webViewLink", "")
+---
+
+### 3. Add to `requirements.txt`
+```
+gspread
