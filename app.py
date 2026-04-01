@@ -469,7 +469,25 @@ if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabl
                             cancel_receipt(h["serial"], st.session_state["user"], cancel_reason.strip())
                             st.session_state.pop(f"confirm_cancel_{h['serial']}", None)
                             st.success(f"Receipt {h['serial']} cancelled.")
-                            st.rerun()
+                            # Generate cancelled PDF
+                            from receipt_core import generate_cancelled_pdf
+                            orig_file = OUT_DIR / h["pdf_file"]
+                            cancelled_file = OUT_DIR / f"CANCELLED_{h['pdf_file']}"
+                            generate_cancelled_pdf(
+                                original_path=orig_file,
+                                output_path=cancelled_file,
+                                cancelled_by=st.session_state["user"],
+                                reason=cancel_reason.strip(),
+                                cancelled_at=datetime.now().isoformat()
+                            )
+                            with open(cancelled_file, "rb") as cf:
+                                st.download_button(
+                                    "⬇️ Download Cancelled Receipt",
+                                    cf.read(),
+                                    file_name=cancelled_file.name,
+                                    mime="application/pdf",
+                                    key=f"dl_cancelled_{h['serial']}"
+                                )
                     if abort:
                         st.session_state.pop(f"confirm_cancel_{h['serial']}", None)
                         st.rerun()
