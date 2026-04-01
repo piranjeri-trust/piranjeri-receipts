@@ -104,7 +104,7 @@ def generate_receipt_pdf(
         from reportlab.lib.utils import ImageReader
         om = ImageReader(str(om_image_path))
         iw, ih = 52, 52
-        c.drawImage(om, mid - iw/2, top - ih - 4, width=iw, height=ih,
+        c.drawImage(om, mid - iw/2, top - ih + 8, width=iw, height=ih,
                     mask='auto', preserveAspectRatio=True)
     else:
         c.setFillColor(HexColor("#FF6B00"))
