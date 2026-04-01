@@ -305,7 +305,7 @@ if selected is not None:
         log_to_sheets(record)
 
         st.success(f"Receipt generated: {receipt_number}")
-        st.success("✅ Receipt logged to Google Sheets.")
+        st.success("✅ Receipt saved successfully.")
 
         with open(out_file, "rb") as f:
             st.download_button(
