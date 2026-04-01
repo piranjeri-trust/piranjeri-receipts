@@ -346,12 +346,24 @@ history = load_history()
 if not history:
     st.info("No receipts generated yet.")
 else:
-    for h in history[::-1]:
-        st.write(
-            f"{h['serial']} | {h['name']} | Rs.{h['amount']} | "
-            f"{h['purpose']} | {h['payment']} | {h.get('user', '')}"
-        )
+    from collections import defaultdict
+    grouped = defaultdict(list)
+    for h in history:
+        try:
+            dt = datetime.strptime(h["issue_date"], "%Y-%m-%d")
+            key = dt.strftime("%B %Y")
+        except:
+            key = "Unknown"
+        grouped[key].append(h)
 
+    for month_label in sorted(grouped.keys(), reverse=True):
+        entries = grouped[month_label]
+        with st.expander(f"📁 {month_label}  ({len(entries)} receipts)"):
+            for h in sorted(entries, key=lambda x: x["serial"], reverse=True):
+                st.write(
+                    f"{h['serial']} | {h['name']} | Rs.{h['amount']} | "
+                    f"{h['purpose']} | {h['payment']} | {h.get('user', '')}"
+                )
 # ---------------- REPRINT SEARCH ----------------
 st.subheader("Reprint Receipt")
 
