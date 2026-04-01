@@ -237,3 +237,49 @@ def generate_receipt_pdf(
 
     c.save()
     return {"receipt_number": receipt_number}
+    def generate_cancelled_pdf(original_path: Path, output_path: Path, cancelled_by: str, reason: str, cancelled_at: str):
+    """Overlay a CANCELLED watermark on an existing receipt PDF."""
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.colors import HexColor
+    import io
+    try:
+        from pypdf import PdfReader, PdfWriter
+    except ImportError:
+        from PyPDF2 import PdfReader, PdfWriter
+
+    RED = HexColor("#CC0000")
+
+    # Create watermark
+    watermark_buffer = io.BytesIO()
+    wc = canvas.Canvas(watermark_buffer, pagesize=(PAGE_W, PAGE_H))
+    wc.saveState()
+    wc.translate(PAGE_W / 2, PAGE_H / 2)
+    wc.rotate(35)
+    wc.setFillColor(RED)
+    wc.setFillAlpha(0.25)
+    wc.setFont("Helvetica-Bold", 90)
+    wc.drawCentredString(0, 20, "CANCELLED")
+    wc.setFont("Helvetica", 14)
+    wc.setFillAlpha(0.5)
+    wc.drawCentredString(0, -30, f"By: {cancelled_by}  |  {cancelled_at[:10]}")
+    wc.drawCentredString(0, -52, f"Reason: {reason[:60]}")
+    wc.restoreState()
+    wc.save()
+    watermark_buffer.seek(0)
+
+    # Merge watermark onto original
+    watermark_pdf = PdfReader(watermark_buffer)
+    original_pdf = PdfReader(str(original_path))
+    writer = PdfWriter()
+
+    for page in original_pdf.pages:
+        page.merge_page(watermark_pdf.pages[0])
+        writer.add_page(page)
+
+    with open(str(output_path), "wb") as f:
+        writer.write(f)
+```
+
+Then add `pypdf` to `requirements.txt`:
+```
+pypdf
