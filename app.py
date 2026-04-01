@@ -405,42 +405,67 @@ if search_issue_date:
 if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabled:
     if filtered_history:
         for i, h in enumerate(filtered_history[::-1]):
-            col1, col2 = st.columns([5, 1])
-
-            with col1:
+            status = h.get("status", "ACTIVE")
+            
+            if status == "CANCELLED":
+                st.markdown(
+                    f"~~{h['serial']}~~ | {h['name']} | Rs.{h['amount']} | "
+                    f"{h['purpose']} | ❌ CANCELLED by {h.get('cancelled_by','')} — {h.get('cancel_reason','')}"
+                )
+            else:
                 st.write(
                     f"{h['serial']} | {h['name']} | Rs.{h['amount']} | "
                     f"{h['purpose']} | {h['payment']}"
                 )
-
-            with col2:
-                if st.button("Reprint", key=f"reprint_{i}_{h['serial']}"):
-                    out_file = OUT_DIR / h["pdf_file"]
-
-                    generate_receipt_pdf(
-                        output_path=out_file,
-                        donor_name=h["name"],
-                        donor_mobile=h["mobile"],
-                        amount=float(h["amount"]),
-                        credit_date=h["credit_date"],
-                        issue_date=h["issue_date"],
-                        receipt_for=h["purpose"],
-                        counter_path=COUNTER_FILE,
-                        om_image_path=OM_PATH,
-                        payment_method=h["payment"],
-                        cheque_number=h.get("cheque_number", ""),
-                        receipt_number_override=h["serial"],
-                    )
-
-                    st.success(f"Reprinted receipt {h['serial']}")
-
-                    with open(out_file, "rb") as f:
-                        st.download_button(
-                            f"Download {h['serial']}",
-                            f.read(),
-                            file_name=out_file.name,
-                            mime="application/pdf",
-                            key=f"download_reprint_{i}_{h['serial']}"
+                btn_col1, btn_col2 = st.columns([1, 1])
+                with btn_col1:
+                    if st.button("🖨️ Reprint", key=f"reprint_{i}_{h['serial']}"):
+                        out_file = OUT_DIR / h["pdf_file"]
+                        generate_receipt_pdf(
+                            output_path=out_file,
+                            donor_name=h["name"],
+                            donor_mobile=h["mobile"],
+                            amount=float(h["amount"]),
+                            credit_date=h["credit_date"],
+                            issue_date=h["issue_date"],
+                            receipt_for=h["purpose"],
+                            counter_path=COUNTER_FILE,
+                            om_image_path=OM_PATH,
+                            payment_method=h["payment"],
+                            cheque_number=h.get("cheque_number", ""),
+                            receipt_number_override=h["serial"],
                         )
-    else:
-        st.warning("No matching receipt found.")
+                        st.success(f"Reprinted receipt {h['serial']}")
+                        with open(out_file, "rb") as f:
+                            st.download_button(
+                                f"Download {h['serial']}",
+                                f.read(),
+                                file_name=out_file.name,
+                                mime="application/pdf",
+                                key=f"download_reprint_{i}_{h['serial']}"
+                            )
+                with btn_col2:
+                    if st.button("❌ Cancel", key=f"cancel_{i}_{h['serial']}"):
+                        st.session_state[f"confirm_cancel_{h['serial']}"] = True
+
+            if st.session_state.get(f"confirm_cancel_{h['serial']}", False):
+                with st.form(key=f"cancel_form_{h['serial']}"):
+                    st.warning(f"Cancel receipt {h['serial']} — {h['name']} — Rs.{h['amount']}?")
+                    cancel_reason = st.text_input("Reason for cancellation (required)")
+                    col_yes, col_no = st.columns(2)
+                    with col_yes:
+                        confirm = st.form_submit_button("Confirm Cancel")
+                    with col_no:
+                        abort = st.form_submit_button("No, go back")
+
+                    if confirm:
+                        if not cancel_reason.strip():
+                            st.error("Please enter a reason.")
+                        else:
+                            cancel_receipt(h["serial"], st.session_state["user"], cancel_reason.strip())
+                            st.session_state.pop(f"confirm_cancel_{h['serial']}", None)
+                            st.success(f"Receipt {h['serial']} cancelled.")
+                            st.rerun()
+                    if abort:
+                        st.session_state.pop(f"confirm_cancel_{h['serial']}", None)
+                        st.rerun()
