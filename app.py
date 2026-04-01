@@ -156,6 +156,7 @@ if st.button("Logout"):
     st.rerun()
 
 donors = load_donors()
+donors = donors.sort_values("NAME").reset_index(drop=True)
 
 # ---------------- SEARCH / SELECT DONOR ----------------
 search = st.text_input("Search donor by name or mobile number")
