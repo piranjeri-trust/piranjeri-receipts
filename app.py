@@ -159,16 +159,7 @@ donors = load_donors()
 donors = donors.sort_values("NAME").reset_index(drop=True)
 
 # ---------------- SEARCH / SELECT DONOR ----------------
-search = st.text_input("Search donor by name or mobile number")
-
 filtered = donors.copy()
-if search.strip():
-    q = search.strip().lower()
-    q_mobile = normalize_mobile(search)
-    filtered = donors[
-        donors["NAME"].str.lower().str.contains(q, na=False) |
-        donors["Mobile Number"].astype(str).str.contains(q_mobile, na=False)
-    ]
 
 if filtered.empty:
     st.warning("No donor found. You can add a new donor below.")
