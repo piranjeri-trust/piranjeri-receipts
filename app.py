@@ -154,7 +154,10 @@ if st.button("Logout"):
     st.session_state.clear()
     st.rerun()
 
-donors = load_donors()
+from storage import load_donors_from_sheets
+import pandas as pd
+rows = load_donors_from_sheets()
+donors = pd.DataFrame(rows)
 
 # ---------------- SEARCH / SELECT DONOR ----------------
 search = st.text_input("Search donor by name or mobile number")
