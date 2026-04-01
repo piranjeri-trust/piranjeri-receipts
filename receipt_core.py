@@ -100,9 +100,10 @@ def generate_receipt_pdf(
     c.setLineWidth(1)
     c.rect(left, bottom, right - left, top - bottom)
 
-    if om_image_path and Path(om_image_path).exists():
-        om = ImageReader(str(om_image_path))
-        c.drawImage(om, mid - 26, top - 38, width=52, height=52, mask='auto')
+    c.setFillColor(HexColor("#FF6B00"))
+    c.setFont("Helvetica-Bold", 36)
+    c.drawCentredString(mid, top - 38, "\u0950")
+    c.setFillColor(BLUE)
     c.setFillColor(BLUE)
     c.setFont(FONT_REG, 10)
     c.drawCentredString(mid, top - 48, HELPER_LINE)
