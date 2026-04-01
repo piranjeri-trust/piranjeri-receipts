@@ -47,6 +47,7 @@ COUNTRY_CODES = {
     "UK (+44)": "44",
     "USA (+1)": "1"
 }
+
 # ---------------- INIT FILES ----------------
 if not HISTORY_FILE.exists():
     HISTORY_FILE.write_text("[]", encoding="utf-8")
@@ -105,28 +106,6 @@ def get_serial(issue_date: datetime):
 
     return f"{data['count']:03d}/{fy}"
 
-    if not COUNTER_FILE.exists():
-        data = {"year": year, "count": 0}
-    else:
-        with open(COUNTER_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-    if data.get("year") != year:
-        data = {"year": year, "count": 0}
-    else:
-        # support old file format
-        if "count" not in data:
-            if "last_serial" in data:
-                data["count"] = data["last_serial"]
-            else:
-                data["count"] = 0
-
-    data["count"] += 1
-
-    with open(COUNTER_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f)
-
-    return f"{data['count']:03d}/{year}"
 # ---------------- DONORS ----------------
 def ensure_donor_file():
     if not DONOR_FILE.exists():
@@ -163,6 +142,19 @@ def load_history():
     with open(HISTORY_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def cancel_receipt(serial: str, cancelled_by: str, reason: str):
+    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    for record in data:
+        if record["serial"] == serial:
+            record["status"] = "CANCELLED"
+            record["cancelled_by"] = cancelled_by
+            record["cancelled_at"] = datetime.now().isoformat()
+            record["cancel_reason"] = reason
+            break
+    with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
 # ---------------- APP ----------------
 if "user" not in st.session_state:
     login()
@@ -180,7 +172,7 @@ if st.button("Logout"):
 donors = load_donors()
 donors = donors.sort_values("NAME").reset_index(drop=True)
 
-# ---------------- SEARCH / SELECT DONOR ----------------
+# ---------------- SELECT DONOR ----------------
 filtered = donors.copy()
 
 if filtered.empty:
@@ -220,6 +212,7 @@ with st.expander("Add New Donor"):
                 save_donors(donors)
                 st.success("New donor added. Refresh search if needed.")
                 st.rerun()
+
 # ---------------- EDIT DONOR ----------------
 if selected is not None:
     with st.expander("Edit Selected Donor"):
@@ -257,6 +250,7 @@ if selected is not None:
                 save_donors(donors)
                 st.success("Donor updated successfully.")
                 st.rerun()
+
 # ---------------- RECEIPT FORM ----------------
 if selected is not None:
     donor_name = donors.loc[selected_index, "NAME"]
@@ -272,7 +266,6 @@ if selected is not None:
     with col2:
         issue_date = st.date_input("Receipt issue date", value=datetime.today())
         purpose = st.selectbox("Purpose", PURPOSES)
-       
         optional_note = st.text_input("Optional note")
 
     cheque_number = ""
@@ -315,6 +308,7 @@ if selected is not None:
             "user": st.session_state["user"],
             "pdf_file": str(out_file.name),
             "created_at": datetime.now().isoformat(),
+            "status": "ACTIVE",
         }
         save_history(record)
         log_to_sheets(record)
@@ -337,7 +331,7 @@ if selected is not None:
         full_mobile = normalize_mobile(donor_mobile)
         whatsapp_url = f"https://wa.me/{full_mobile}?text={whatsapp_text.replace(' ', '%20')}"
         st.markdown(f"[Open WhatsApp chat]({whatsapp_url})")
-#---------------- HISTORY ----------------
+
 # ---------------- RECEIPT HISTORY ----------------
 st.subheader("Receipt History")
 
@@ -360,12 +354,21 @@ else:
         entries = grouped[month_label]
         with st.expander(f"📁 {month_label}  ({len(entries)} receipts)"):
             for h in sorted(entries, key=lambda x: x["serial"], reverse=True):
-                st.write(
-                    f"{h['serial']} | {h['name']} | Rs.{h['amount']} | "
-                    f"{h['purpose']} | {h['payment']} | {h.get('user', '')}"
-                )
-# ---------------- REPRINT SEARCH ----------------
-st.subheader("Reprint Receipt")
+                status = h.get("status", "ACTIVE")
+                if status == "CANCELLED":
+                    st.markdown(
+                        f"~~{h['serial']}~~ | {h['name']} | Rs.{h['amount']} | "
+                        f"{h['purpose']} | {h['payment']} | "
+                        f"❌ CANCELLED by {h.get('cancelled_by','')} — {h.get('cancel_reason','')}"
+                    )
+                else:
+                    st.write(
+                        f"{h['serial']} | {h['name']} | Rs.{h['amount']} | "
+                        f"{h['purpose']} | {h['payment']} | {h.get('user', '')}"
+                    )
+
+# ---------------- REPRINT & CANCEL ----------------
+st.subheader("Reprint / Cancel Receipt")
 
 search_col1, search_col2, search_col3 = st.columns(3)
 
@@ -379,7 +382,8 @@ with search_col3:
     search_issue_date_enabled = st.checkbox("Filter by Issue Date")
     search_issue_date = None
     if search_issue_date_enabled:
-      search_issue_date = st.date_input("Select Issue Date", value=datetime.today())
+        search_issue_date = st.date_input("Select Issue Date", value=datetime.today())
+
 filtered_history = history
 
 if search_receipt_no.strip():
@@ -406,19 +410,20 @@ if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabl
     if filtered_history:
         for i, h in enumerate(filtered_history[::-1]):
             status = h.get("status", "ACTIVE")
-            
+            st.divider()
+
             if status == "CANCELLED":
                 st.markdown(
                     f"~~{h['serial']}~~ | {h['name']} | Rs.{h['amount']} | "
-                    f"{h['purpose']} | ❌ CANCELLED by {h.get('cancelled_by','')} — {h.get('cancel_reason','')}"
+                    f"{h['purpose']} | ❌ **CANCELLED** by {h.get('cancelled_by','')} — _{h.get('cancel_reason','')}_"
                 )
             else:
                 st.write(
                     f"{h['serial']} | {h['name']} | Rs.{h['amount']} | "
                     f"{h['purpose']} | {h['payment']}"
                 )
-                btn_col1, btn_col2 = st.columns([1, 1])
-                with btn_col1:
+                btn1, btn2 = st.columns(2)
+                with btn1:
                     if st.button("🖨️ Reprint", key=f"reprint_{i}_{h['serial']}"):
                         out_file = OUT_DIR / h["pdf_file"]
                         generate_receipt_pdf(
@@ -444,7 +449,7 @@ if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabl
                                 mime="application/pdf",
                                 key=f"download_reprint_{i}_{h['serial']}"
                             )
-                with btn_col2:
+                with btn2:
                     if st.button("❌ Cancel", key=f"cancel_{i}_{h['serial']}"):
                         st.session_state[f"confirm_cancel_{h['serial']}"] = True
 
@@ -457,7 +462,6 @@ if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabl
                         confirm = st.form_submit_button("Confirm Cancel")
                     with col_no:
                         abort = st.form_submit_button("No, go back")
-
                     if confirm:
                         if not cancel_reason.strip():
                             st.error("Please enter a reason.")
@@ -469,3 +473,5 @@ if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabl
                     if abort:
                         st.session_state.pop(f"confirm_cancel_{h['serial']}", None)
                         st.rerun()
+    else:
+        st.warning("No matching receipt found.")
