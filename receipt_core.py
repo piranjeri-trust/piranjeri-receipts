@@ -102,8 +102,7 @@ def generate_receipt_pdf(
 
     if om_image_path and Path(om_image_path).exists():
         om = ImageReader(str(om_image_path))
-        c.drawImage(om, mid - 18, top - 33, width=36, height=36, mask='auto')
-
+        c.drawImage(om, mid - 26, top - 38, width=52, height=52, mask='auto')
     c.setFillColor(BLUE)
     c.setFont(FONT_REG, 10)
     c.drawCentredString(mid, top - 48, HELPER_LINE)
