@@ -454,15 +454,11 @@ if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabl
                         st.session_state[f"confirm_cancel_{h['serial']}"] = True
 
             if st.session_state.get(f"confirm_cancel_{h['serial']}", False):
-                with st.form(key=f"cancel_form_{h['serial']}"):
-                    st.warning(f"Cancel receipt {h['serial']} — {h['name']} — Rs.{h['amount']}?")
-                    cancel_reason = st.text_input("Reason for cancellation (required)")
-                    col_yes, col_no = st.columns(2)
-                    with col_yes:
-                        confirm = st.form_submit_button("Confirm Cancel")
-                    with col_no:
-                        abort = st.form_submit_button("No, go back")
-                    if confirm:
+                st.warning(f"Cancel receipt {h['serial']} — {h['name']} — Rs.{h['amount']}?")
+                cancel_reason = st.text_input("Reason for cancellation (required)", key=f"reason_{h['serial']}")
+                col_yes, col_no = st.columns(2)
+                with col_yes:
+                    if st.button("Confirm Cancel", key=f"confirm_{h['serial']}"):
                         if not cancel_reason.strip():
                             st.error("Please enter a reason.")
                         else:
@@ -480,8 +476,22 @@ if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabl
                             st.session_state[f"cancelled_file_{h['serial']}"] = str(cancelled_file)
                             st.session_state.pop(f"confirm_cancel_{h['serial']}", None)
                             st.rerun()
-                    if abort:
+                with col_no:
+                    if st.button("No, go back", key=f"abort_{h['serial']}"):
                         st.session_state.pop(f"confirm_cancel_{h['serial']}", None)
                         st.rerun()
+
+            cancelled_key = f"cancelled_file_{h['serial']}"
+            if st.session_state.get(cancelled_key):
+                cancelled_file = Path(st.session_state[cancelled_key])
+                if cancelled_file.exists():
+                    with open(cancelled_file, "rb") as cf:
+                        st.download_button(
+                            "⬇️ Download Cancelled Receipt",
+                            cf.read(),
+                            file_name=cancelled_file.name,
+                            mime="application/pdf",
+                            key=f"dl_cancelled_{h['serial']}"
+                        )
     else:
         st.warning("No matching receipt found.")
