@@ -81,7 +81,29 @@ def check_session():
 
 # ---------------- SERIAL ----------------
 def get_serial(issue_date: datetime):
-    year = issue_date.year
+    if issue_date.month >= 4:
+        fy = issue_date.year
+    else:
+        fy = issue_date.year - 1
+
+    if not COUNTER_FILE.exists():
+        data = {"year": fy, "count": 0}
+    else:
+        with open(COUNTER_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+    if data.get("year") != fy:
+        data = {"year": fy, "count": 0}
+    else:
+        if "count" not in data:
+            data["count"] = data.get("last_serial", 0)
+
+    data["count"] += 1
+
+    with open(COUNTER_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+    return f"{data['count']:03d}/{fy}"
 
     if not COUNTER_FILE.exists():
         data = {"year": year, "count": 0}
