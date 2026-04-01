@@ -3,3 +3,4 @@ gspread
 reportlab
 google-auth
 gspread
+pypdf
