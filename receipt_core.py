@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import datetime
 import json
+import io
 import pandas as pd
 from reportlab.pdfgen import canvas
 from reportlab.lib.colors import HexColor
@@ -101,7 +102,6 @@ def generate_receipt_pdf(
     c.rect(left, bottom, right - left, top - bottom)
 
     if om_image_path and Path(om_image_path).exists():
-        from reportlab.lib.utils import ImageReader
         om = ImageReader(str(om_image_path))
         iw, ih = 52, 52
         c.drawImage(om, mid - iw/2, top - ih + 8, width=iw, height=ih,
@@ -111,6 +111,7 @@ def generate_receipt_pdf(
         c.setFont("Helvetica-Bold", 28)
         c.drawCentredString(mid, top - 38, "OM")
         c.setFillColor(BLUE)
+
     c.setFillColor(BLUE)
     c.setFont(FONT_REG, 10)
     c.drawCentredString(mid, top - 48, HELPER_LINE)
@@ -237,19 +238,13 @@ def generate_receipt_pdf(
 
     c.save()
     return {"receipt_number": receipt_number}
-    def generate_cancelled_pdf(original_path: Path, output_path: Path, cancelled_by: str, reason: str, cancelled_at: str):
-    """Overlay a CANCELLED watermark on an existing receipt PDF."""
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.colors import HexColor
-    import io
-    try:
-        from pypdf import PdfReader, PdfWriter
-    except ImportError:
-        from PyPDF2 import PdfReader, PdfWriter
+
+
+def generate_cancelled_pdf(original_path: Path, output_path: Path, cancelled_by: str, reason: str, cancelled_at: str):
+    from pypdf import PdfReader, PdfWriter
 
     RED = HexColor("#CC0000")
 
-    # Create watermark
     watermark_buffer = io.BytesIO()
     wc = canvas.Canvas(watermark_buffer, pagesize=(PAGE_W, PAGE_H))
     wc.saveState()
@@ -267,7 +262,6 @@ def generate_receipt_pdf(
     wc.save()
     watermark_buffer.seek(0)
 
-    # Merge watermark onto original
     watermark_pdf = PdfReader(watermark_buffer)
     original_pdf = PdfReader(str(original_path))
     writer = PdfWriter()
