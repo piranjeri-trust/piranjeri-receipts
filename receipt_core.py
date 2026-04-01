@@ -278,8 +278,3 @@ def generate_receipt_pdf(
 
     with open(str(output_path), "wb") as f:
         writer.write(f)
-```
-
-Then add `pypdf` to `requirements.txt`:
-```
-pypdf
