@@ -16,7 +16,11 @@ def get_sheets_client():
 def log_to_sheets(record: dict):
     client = get_sheets_client()
     spreadsheet_id = st.secrets["google_sheets"]["spreadsheet_id"]
-    sheet = client.open_by_key(spreadsheet_id).sheet1
+
+    st.write("DEBUG spreadsheet_id:", spreadsheet_id)
+    st.write("DEBUG client_email:", json.loads(st.secrets["google_service_account_json"])["client_email"])
+
+    sheet = client.open_by_key(spreadsheet_id).get_worksheet(0)
 
     existing = sheet.get_all_values()
     if not existing:
