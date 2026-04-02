@@ -516,7 +516,7 @@ else:
 
     selected_month = st.selectbox("Select month to generate report", months_available)
 
-    if st.button("📥 Generate & Download Excel Report", type="primary"):
+   if st.button("📥 Generate & Download Excel Report", type="primary"):
     month_data = [
         h for h in active_history
         if datetime.strptime(h["issue_date"], "%Y-%m-%d").strftime("%B %Y") == selected_month
@@ -535,9 +535,18 @@ else:
     st.session_state["report_month"] = selected_month
     st.session_state["report_count"] = len(month_data)
 
-# ✅ Download button lives OUTSIDE the if-button block
 if st.session_state.get("report_bytes"):
     st.download_button(
+        f"⬇️ Download {st.session_state['report_month']} Report",
+        st.session_state["report_bytes"],
+        file_name=st.session_state["report_filename"],
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="report_download"
+    )
+    st.success(
+        f"✅ Report generated for {st.session_state['report_month']} "
+        f"— {st.session_state['report_count']} receipts."
+    )
         f"⬇️ Download {st.session_state['report_month']} Report",
         st.session_state["report_bytes"],
         file_name=st.session_state["report_filename"],
