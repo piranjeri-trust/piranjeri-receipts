@@ -517,24 +517,34 @@ else:
     selected_month = st.selectbox("Select month to generate report", months_available)
 
     if st.button("📥 Generate & Download Excel Report", type="primary"):
-        month_data = [
-            h for h in active_history
-            if datetime.strptime(h["issue_date"], "%Y-%m-%d").strftime("%B %Y") == selected_month
-        ]
+    month_data = [
+        h for h in active_history
+        if datetime.strptime(h["issue_date"], "%Y-%m-%d").strftime("%B %Y") == selected_month
+    ]
 
-        REPORTS_DIR = BASE_DIR / "reports"
-        REPORTS_DIR.mkdir(exist_ok=True)
-        safe_month = selected_month.replace(" ", "_")
-        report_file = REPORTS_DIR / f"Collections_{safe_month}.xlsx"
+    REPORTS_DIR = BASE_DIR / "reports"
+    REPORTS_DIR.mkdir(exist_ok=True)
+    safe_month = selected_month.replace(" ", "_")
+    report_file = REPORTS_DIR / f"Collections_{safe_month}.xlsx"
 
-        generate_collections_report(month_data, selected_month, report_file)
+    generate_collections_report(month_data, selected_month, report_file)
 
-        with open(report_file, "rb") as f:
-            st.download_button(
-                f"⬇️ Download {selected_month} Report",
-                f.read(),
-                file_name=report_file.name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"report_{safe_month}"
-            )
-        st.success(f"✅ Report generated for {selected_month} — {len(month_data)} receipts.")
+    with open(report_file, "rb") as f:
+        st.session_state["report_bytes"] = f.read()
+    st.session_state["report_filename"] = report_file.name
+    st.session_state["report_month"] = selected_month
+    st.session_state["report_count"] = len(month_data)
+
+# ✅ Download button lives OUTSIDE the if-button block
+if st.session_state.get("report_bytes"):
+    st.download_button(
+        f"⬇️ Download {st.session_state['report_month']} Report",
+        st.session_state["report_bytes"],
+        file_name=st.session_state["report_filename"],
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        key="report_download"
+    )
+    st.success(
+        f"✅ Report generated for {st.session_state['report_month']} "
+        f"— {st.session_state['report_count']} receipts."
+    )
