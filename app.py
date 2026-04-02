@@ -495,3 +495,46 @@ if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabl
                         )
     else:
         st.warning("No matching receipt found.")
+
+# ---------------- COLLECTIONS REPORT ----------------
+st.subheader("📊 Collections Report")
+
+history = load_history()
+active_history = [h for h in history if h.get("status", "ACTIVE") != "CANCELLED"]
+
+if not active_history:
+    st.info("No receipts yet to generate a report.")
+else:
+    from collections import defaultdict
+    from generate_report import generate_collections_report
+
+    months_available = sorted(set(
+        datetime.strptime(h["issue_date"], "%Y-%m-%d").strftime("%B %Y")
+        for h in active_history
+        if h.get("issue_date")
+    ), reverse=True)
+
+    selected_month = st.selectbox("Select month to generate report", months_available)
+
+    if st.button("📥 Generate & Download Excel Report", type="primary"):
+        month_data = [
+            h for h in active_history
+            if datetime.strptime(h["issue_date"], "%Y-%m-%d").strftime("%B %Y") == selected_month
+        ]
+
+        REPORTS_DIR = BASE_DIR / "reports"
+        REPORTS_DIR.mkdir(exist_ok=True)
+        safe_month = selected_month.replace(" ", "_")
+        report_file = REPORTS_DIR / f"Collections_{safe_month}.xlsx"
+
+        generate_collections_report(month_data, selected_month, report_file)
+
+        with open(report_file, "rb") as f:
+            st.download_button(
+                f"⬇️ Download {selected_month} Report",
+                f.read(),
+                file_name=report_file.name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"report_{safe_month}"
+            )
+        st.success(f"✅ Report generated for {selected_month} — {len(month_data)} receipts.")
