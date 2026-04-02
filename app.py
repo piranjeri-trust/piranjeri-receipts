@@ -497,7 +497,6 @@ if search_receipt_no.strip() or search_mobile.strip() or search_issue_date_enabl
         st.warning("No matching receipt found.")
 
 # ---------------- COLLECTIONS REPORT ----------------
-# ---------------- COLLECTIONS REPORT ----------------
 st.subheader("📊 Collections Report")
 
 history = load_history()
