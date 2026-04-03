@@ -38,18 +38,15 @@ def load_history() -> list:
     try:
         ws = get_sheet("History")
         rows = ws.get_all_records()
-        # Convert empty strings back to proper types
         history = []
         for row in rows:
             record = dict(row)
-            # Clean up empty fields
-            for k, v in record.items():
-                if v == "":
-                    record[k] = ""
             history.append(record)
         return history
     except Exception as e:
+        import traceback
         st.error(f"Error loading history: {e}")
+        st.code(traceback.format_exc())
         return []
 
 
@@ -139,9 +136,11 @@ def load_donors_from_sheets() -> list:
     try:
         ws = get_sheet("Donors")
         rows = ws.get_all_records()
-        return rows  # list of dicts with NAME, Mobile Number
+        return rows
     except Exception as e:
+        import traceback
         st.error(f"Error loading donors: {e}")
+        st.code(traceback.format_exc())
         return []
 
 
