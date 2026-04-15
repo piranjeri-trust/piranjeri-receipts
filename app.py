@@ -100,19 +100,40 @@ def ensure_donor_file():
 
 def load_donors():
     ensure_donor_file()
-    df = pd.read_csv(DONOR_FILE)
+
+    # ── Read raw lines and strip duplicate header rows ────────────
+    # donors.csv sometimes gets concatenated, leaving "NAME,Mobile Number"
+    # appearing again mid-file (e.g. row 10). Remove all such repeat headers.
+    raw_lines = DONOR_FILE.read_text(encoding="utf-8").splitlines()
+    if not raw_lines:
+        return pd.DataFrame(columns=["NAME", "Mobile Number"])
+
+    header = raw_lines[0]
+    # Keep the first header line; drop any subsequent lines that repeat it
+    # or look like a header (NAME or common aliases in the first field)
+    header_markers = {"name", "donor", "donor name", "member", "members"}
+    cleaned = [header]
+    for line in raw_lines[1:]:
+        first_field = line.split(",")[0].strip().lower()
+        if first_field in header_markers:
+            continue   # skip repeated header rows
+        cleaned.append(line)
+
+    # Re-parse cleaned CSV from memory
+    from io import StringIO
+    df = pd.read_csv(StringIO("\n".join(cleaned)))
     df.columns = [c.strip() for c in df.columns]
 
     # ── Resolve NAME column ───────────────────────────────────────
     name_aliases = ["NAME", "Name", "name", "DONOR", "Donor",
-                    "DONOR NAME", "Donor Name", "donor name"]
+                    "DONOR NAME", "Donor Name", "donor name",
+                    "Member", "MEMBER", "Members"]
     if "NAME" not in df.columns:
         for alias in name_aliases:
             if alias in df.columns:
                 df = df.rename(columns={alias: "NAME"})
                 break
         else:
-            # No recognised header — treat first column as NAME
             df = df.rename(columns={df.columns[0]: "NAME"})
 
     # ── Resolve Mobile Number column (fully optional) ─────────────
@@ -125,13 +146,17 @@ def load_donors():
                 df = df.rename(columns={alias: "Mobile Number"})
                 break
         else:
-            df["Mobile Number"] = ""  # column entirely absent — add empty
+            df["Mobile Number"] = ""
 
     df["NAME"] = df["NAME"].astype(str).fillna("").str.strip()
     df["Mobile Number"] = df["Mobile Number"].astype(str).fillna("").str.strip()
 
-    # Drop blank / nan name rows
-    df = df[~df["NAME"].str.lower().isin(["", "nan"])].reset_index(drop=True)
+    # Drop blank / nan / header-repeat rows
+    df = df[~df["NAME"].str.lower().isin(["", "nan"] + list(header_markers))].reset_index(drop=True)
+
+    # Also clean donors.csv on disk — write back the de-duplicated version
+    # so the file stays clean for future reads
+    df[["NAME", "Mobile Number"]].to_csv(DONOR_FILE, index=False)
 
     return df[["NAME", "Mobile Number"]]
 
