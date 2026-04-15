@@ -102,13 +102,38 @@ def load_donors():
     ensure_donor_file()
     df = pd.read_csv(DONOR_FILE)
     df.columns = [c.strip() for c in df.columns]
+
+    # ── Resolve NAME column ───────────────────────────────────────
+    name_aliases = ["NAME", "Name", "name", "DONOR", "Donor",
+                    "DONOR NAME", "Donor Name", "donor name"]
     if "NAME" not in df.columns:
-        df["NAME"] = ""
+        for alias in name_aliases:
+            if alias in df.columns:
+                df = df.rename(columns={alias: "NAME"})
+                break
+        else:
+            # No recognised header — treat first column as NAME
+            df = df.rename(columns={df.columns[0]: "NAME"})
+
+    # ── Resolve Mobile Number column (fully optional) ─────────────
+    mobile_aliases = ["Mobile Number", "Mobile", "mobile", "MOBILE",
+                      "Phone", "PHONE", "mobile number", "MOBILE NUMBER",
+                      "Phone Number", "phone", "Contact"]
     if "Mobile Number" not in df.columns:
-        df["Mobile Number"] = ""
+        for alias in mobile_aliases:
+            if alias in df.columns:
+                df = df.rename(columns={alias: "Mobile Number"})
+                break
+        else:
+            df["Mobile Number"] = ""  # column entirely absent — add empty
+
     df["NAME"] = df["NAME"].astype(str).fillna("").str.strip()
     df["Mobile Number"] = df["Mobile Number"].astype(str).fillna("").str.strip()
-    return df
+
+    # Drop blank / nan name rows
+    df = df[~df["NAME"].str.lower().isin(["", "nan"])].reset_index(drop=True)
+
+    return df[["NAME", "Mobile Number"]]
 
 def save_donors(df):
     df.to_csv(DONOR_FILE, index=False)
@@ -165,7 +190,8 @@ if donors.empty:
     selected_index = None
 else:
     donor_options = [
-        f"{row['NAME']} - {row['Mobile Number']}"
+        row['NAME'] if not row['Mobile Number'] or row['Mobile Number'] in ('', 'nan')
+        else f"{row['NAME']} - {row['Mobile Number']}"
         for _, row in donors.iterrows()
     ]
     selected = st.selectbox("Select donor", donor_options)
