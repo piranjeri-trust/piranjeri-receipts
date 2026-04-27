@@ -281,3 +281,153 @@ def generate_collections_report(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(output_path))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# FULL YEAR REPORT
+# ══════════════════════════════════════════════════════════════════════════════
+def generate_annual_report(
+    all_history: List[Dict],
+    financial_year: int,
+    output_path: Path,
+):
+    """
+    Generate a full-year Excel workbook.
+
+    Structure:
+      - Sheet "Summary"            : one row per month — active count, total, cancelled count
+      - One sheet per month        : e.g. "Apr 2026", "May 2026" ... with active receipts
+      - Sheet "Cancelled - FY2026" : all cancelled receipts for the year
+
+    Parameters
+    ----------
+    all_history     : full list of receipt dicts from Supabase
+    financial_year  : e.g. 2026  (covers Apr 2025 – Mar 2026 if Indian FY,
+                      or Jan–Dec if calendar year — determined by issue_date)
+    output_path     : Path for the .xlsx file
+    """
+    from collections import defaultdict
+
+    wb = openpyxl.Workbook()
+
+    # ── Sort all receipts into months ──────────────────────────────
+    month_order = []
+    month_active: Dict[str, List[Dict]]    = defaultdict(list)
+    month_cancelled: Dict[str, List[Dict]] = defaultdict(list)
+
+    for h in all_history:
+        try:
+            dt  = datetime.strptime(str(h.get("issue_date", "")), "%Y-%m-%d")
+            key = dt.strftime("%b %Y")      # e.g. "Apr 2026"
+            if key not in month_order:
+                month_order.append(key)
+            if h.get("status", "ACTIVE") == "CANCELLED":
+                month_cancelled[key].append(h)
+            else:
+                month_active[key].append(h)
+        except Exception:
+            pass
+
+    # Sort months chronologically
+    def month_sort_key(m):
+        try:
+            return datetime.strptime(m, "%b %Y")
+        except Exception:
+            return datetime.min
+
+    month_order = sorted(set(month_order), key=month_sort_key)
+
+    # ── Sheet 1: Summary ──────────────────────────────────────────
+    ws_sum = wb.active
+    ws_sum.title = "Summary"
+
+    # Title
+    ws_sum.merge_cells("A1:G1")
+    tc = ws_sum["A1"]
+    tc.value     = f"Piranjeri Temples Family Trust — Annual Collections Summary {financial_year}"
+    tc.font      = Font(bold=True, size=13, color="FFFFFF")
+    tc.fill      = PatternFill("solid", fgColor=NAVY)
+    tc.alignment = Alignment(horizontal="center", vertical="center")
+    ws_sum.row_dimensions[1].height = 22
+
+    # Header row
+    sum_headers = ["Month", "Active Receipts", "Total Collected (Rs.)",
+                   "Cancelled Receipts", "Cancelled Amount (Rs.)",
+                   "Net Receipts", "Net Amount (Rs.)"]
+    for col, hdr in enumerate(sum_headers, 1):
+        c = ws_sum.cell(row=2, column=col, value=hdr)
+        c.font      = Font(bold=True, color="FFFFFF")
+        c.fill      = PatternFill("solid", fgColor=SAFFRON)
+        c.alignment = Alignment(horizontal="center")
+        c.border    = thin_border()
+
+    col_widths_sum = [16, 16, 22, 18, 22, 14, 20]
+    for i, w in enumerate(col_widths_sum, 1):
+        ws_sum.column_dimensions[get_column_letter(i)].width = w
+
+    grand_active = grand_total = grand_cancelled_count = grand_cancelled_amt = 0
+
+    for r_idx, month in enumerate(month_order, start=1):
+        active    = month_active.get(month, [])
+        cancelled = month_cancelled.get(month, [])
+        a_total   = sum(float(h.get("amount", 0)) for h in active)
+        c_total   = sum(float(h.get("amount", 0)) for h in cancelled)
+
+        grand_active          += len(active)
+        grand_total           += a_total
+        grand_cancelled_count += len(cancelled)
+        grand_cancelled_amt   += c_total
+
+        row    = r_idx + 2
+        fill   = PatternFill("solid", fgColor=LIGHT_BLUE if r_idx % 2 == 0 else WHITE)
+        values = [month, len(active), a_total, len(cancelled), c_total,
+                  len(active) - len(cancelled), a_total - c_total]
+        for col, val in enumerate(values, 1):
+            c = ws_sum.cell(row=row, column=col, value=val)
+            c.fill   = fill
+            c.border = thin_border()
+            c.alignment = Alignment(
+                horizontal="right" if col in (3,5,7) else "center" if col != 1 else "left"
+            )
+            if col in (3, 5, 7):
+                c.number_format = "#,##0.00"
+
+    # Grand total row
+    gr = len(month_order) + 3
+    grand_vals = ["GRAND TOTAL", grand_active, grand_total,
+                  grand_cancelled_count, grand_cancelled_amt,
+                  grand_active - grand_cancelled_count,
+                  grand_total  - grand_cancelled_amt]
+    for col, val in enumerate(grand_vals, 1):
+        c = ws_sum.cell(row=gr, column=col, value=val)
+        c.font   = Font(bold=True, size=11, color="FFFFFF")
+        c.fill   = PatternFill("solid", fgColor=NAVY)
+        c.border = thin_border()
+        c.alignment = Alignment(
+            horizontal="right" if col in (3,5,7) else "center" if col != 1 else "left"
+        )
+        if col in (3, 5, 7):
+            c.number_format = "#,##0.00"
+
+    # ── One sheet per month ───────────────────────────────────────
+    for month in month_order:
+        active    = month_active.get(month, [])
+        cancelled = month_cancelled.get(month, [])
+        # Sheet name max 31 chars
+        ws = wb.create_sheet(month[:31])
+        _write_collections_sheet(ws, active, month)
+
+    # ── Cancelled sheet for the year ──────────────────────────────
+    all_cancelled = []
+    for month in month_order:
+        all_cancelled.extend(month_cancelled.get(month, []))
+
+    ws_can = wb.create_sheet(f"Cancelled FY{financial_year}"[:31])
+    _write_cancelled_sheet(ws_can, all_cancelled, f"Full Year {financial_year}")
+
+    # Metadata
+    wb.properties.title   = f"Annual Collections Report — {financial_year}"
+    wb.properties.creator = "Piranjeri Temples Family Trust"
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    wb.save(str(output_path))
