@@ -311,7 +311,7 @@ if selected is not None:
             f"https://wa.me/{normalize_mobile(donor_mobile)}"
             f"?text=%E0%AE%A8%E0%AE%AE%E0%AE%B8%E0%AF%8D%E0%AE%95%E0%AE%BE%E0%AE%B0%E0%AE%AE%E0%AF%8D%20%21%20"
             f"{donor_name.replace(' ','%20')}%2C%20your%20donation%20receipt%20"
-            f"%28{receipt_number.replace('/','%2F')}%29%20from%20Piranjeri%20Temples%20Family%20Trust%20is%20ready."
+            f"%28{receipt_number.replace('/','%2F')}%29%20from%20Piranjeri%20Temples%20Family%20Trust%20is%20attached%2C%20thank%20you."
         )
 
     if st.session_state.get("receipt_bytes"):
