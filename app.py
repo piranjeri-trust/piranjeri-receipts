@@ -499,6 +499,59 @@ else:
                 f"{st.session_state['report_month']}"
             )
 
+    # ── Full Year Report ──────────────────────────────────────────
+    st.divider()
+    st.subheader("📅 Full Year Report")
+
+    # Determine available financial years from history
+    available_years = sorted(set(
+        datetime.strptime(h["issue_date"], "%Y-%m-%d").year
+        for h in history if h.get("issue_date")
+    ), reverse=True)
+
+    if available_years:
+        selected_fy = st.selectbox(
+            "Select year for full report",
+            available_years,
+            format_func=lambda y: f"{y}"
+        )
+
+        if st.button("📥 Generate Full Year Report", type="primary"):
+            # Filter history for selected year
+            year_history = [
+                h for h in history
+                if datetime.strptime(h["issue_date"], "%Y-%m-%d").year == selected_fy
+            ]
+
+            REPORTS_DIR = BASE_DIR / "reports"
+            REPORTS_DIR.mkdir(exist_ok=True)
+            annual_file = REPORTS_DIR / f"Annual_Report_{selected_fy}.xlsx"
+
+            from generate_report import generate_annual_report
+            generate_annual_report(
+                all_history=year_history,
+                financial_year=selected_fy,
+                output_path=annual_file,
+            )
+
+            with open(annual_file, "rb") as f:
+                st.session_state["annual_bytes"]    = f.read()
+            st.session_state["annual_filename"]     = annual_file.name
+            st.session_state["annual_year"]         = selected_fy
+
+        if st.session_state.get("annual_bytes"):
+            st.download_button(
+                f"⬇️ Download Full Year {st.session_state['annual_year']} Report",
+                st.session_state["annual_bytes"],
+                file_name=st.session_state["annual_filename"],
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="annual_dl"
+            )
+            st.success(
+                f"✅ Full year {st.session_state['annual_year']} report ready — "
+                f"one sheet per month + Summary + Cancelled sheets"
+            )
+
 # ── Admin panel ───────────────────────────────────────────────────
 if st.session_state.get("user") == "admin3":
     st.subheader("🔧 Admin Panel")
