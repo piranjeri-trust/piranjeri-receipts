@@ -220,10 +220,18 @@ else:
         selected_index = donors.index[donor_options.index(selected)]
 
 # ── Add donor ─────────────────────────────────────────────────────
+# Use a counter to force input fields to reset after save
+if "add_donor_counter" not in st.session_state:
+    st.session_state["add_donor_counter"] = 0
+
 with st.expander("Add New Donor"):
-    new_name    = st.text_input("New donor name", value="", key="new_donor_name")
-    new_country = st.selectbox("Country code", list(COUNTRY_CODES.keys()), key="add_country")
-    new_mobile  = st.text_input("New donor mobile number (without country code) — optional", value="", key="new_donor_mobile")
+    counter = st.session_state["add_donor_counter"]
+    new_name    = st.text_input("New donor name", value="",
+                                 key=f"new_donor_name_{counter}")
+    new_country = st.selectbox("Country code", list(COUNTRY_CODES.keys()),
+                                key=f"add_country_{counter}")
+    new_mobile  = st.text_input("New donor mobile number (without country code) — optional",
+                                 value="", key=f"new_donor_mobile_{counter}")
     if st.button("Save New Donor"):
         nm = new_name.strip()
         if not nm:
@@ -239,9 +247,8 @@ with st.expander("Add New Donor"):
             else:
                 add_donor(nm, mm)
                 st.success(f"✅ New donor '{nm}' added successfully.")
-                # Clear the input fields by resetting session state keys
-                st.session_state["new_donor_name"]   = ""
-                st.session_state["new_donor_mobile"]  = ""
+                # Increment counter — forces new empty input fields on rerun
+                st.session_state["add_donor_counter"] += 1
                 st.rerun()
 
 # ── Edit donor ────────────────────────────────────────────────────
