@@ -209,14 +209,21 @@ else:
         else f"{r['NAME']} - {r['Mobile Number']}"
         for _, r in donors.iterrows()
     ]
-    selected       = st.selectbox("Select donor", donor_options)
-    selected_index = donors.index[donor_options.index(selected)]
+    selected = st.selectbox(
+        "Select donor",
+        options=["-- Select donor --"] + donor_options
+    )
+    if selected == "-- Select donor --":
+        selected       = None
+        selected_index = None
+    else:
+        selected_index = donors.index[donor_options.index(selected)]
 
 # ── Add donor ─────────────────────────────────────────────────────
 with st.expander("Add New Donor"):
-    new_name    = st.text_input("New donor name")
+    new_name    = st.text_input("New donor name", value="", key="new_donor_name")
     new_country = st.selectbox("Country code", list(COUNTRY_CODES.keys()), key="add_country")
-    new_mobile  = st.text_input("New donor mobile number (without country code) — optional")
+    new_mobile  = st.text_input("New donor mobile number (without country code) — optional", value="", key="new_donor_mobile")
     if st.button("Save New Donor"):
         nm = new_name.strip()
         if not nm:
@@ -231,7 +238,10 @@ with st.expander("Add New Donor"):
                 st.warning("This donor already exists.")
             else:
                 add_donor(nm, mm)
-                st.success("New donor added.")
+                st.success(f"✅ New donor '{nm}' added successfully.")
+                # Clear the input fields by resetting session state keys
+                st.session_state["new_donor_name"]   = ""
+                st.session_state["new_donor_mobile"]  = ""
                 st.rerun()
 
 # ── Edit donor ────────────────────────────────────────────────────
