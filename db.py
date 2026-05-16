@@ -2,8 +2,7 @@
 db.py — Neon PostgreSQL data-access layer for Piranjeri Trust receipts app
 Place this file alongside app.py in the repo root.
 
-Streamlit Secrets format (.streamlit/secrets.toml or Streamlit Cloud → Secrets):
-
+Streamlit Secrets format:
   [neon]
   dsn = "postgresql://neondb_owner:PASSWORD@ep-xxx.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
 """
@@ -14,14 +13,30 @@ import psycopg2.extras
 from contextlib import contextmanager
 from datetime import datetime
 
-# ── Connection ────────────────────────────────────────────────────
+# ── Connection with auto-reconnect ───────────────────────────────
 
-@st.cache_resource
-def _get_connection():
+def _new_connection():
     dsn  = st.secrets["neon"]["dsn"]
     conn = psycopg2.connect(dsn, cursor_factory=psycopg2.extras.RealDictCursor)
     conn.autocommit = False
     return conn
+
+def _get_connection():
+    """Return a live connection, reconnecting if closed or broken."""
+    if "neon_conn" not in st.session_state or st.session_state["neon_conn"] is None:
+        st.session_state["neon_conn"] = _new_connection()
+    else:
+        conn = st.session_state["neon_conn"]
+        try:
+            # ping — if connection is dead this raises an error
+            conn.cursor().execute("SELECT 1")
+        except Exception:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            st.session_state["neon_conn"] = _new_connection()
+    return st.session_state["neon_conn"]
 
 @contextmanager
 def _cursor():
@@ -31,7 +46,10 @@ def _cursor():
             yield cur
         conn.commit()
     except Exception:
-        conn.rollback()
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         raise
 
 def test_connection():
@@ -41,10 +59,6 @@ def test_connection():
 # ── Serial counter ────────────────────────────────────────────────
 
 def next_serial_for_fy(fy: str) -> str:
-    """
-    Atomically increment and return the serial counter for a financial year.
-    Returns serial string like "001/2025".
-    """
     with _cursor() as cur:
         cur.execute("""
             INSERT INTO serial_counter (fy, count)
@@ -57,7 +71,6 @@ def next_serial_for_fy(fy: str) -> str:
     return f"{count:03d}/{fy}"
 
 def reset_serial_counter(fy: str, start_from: int):
-    """Reset the counter for a financial year to start_from."""
     with _cursor() as cur:
         cur.execute("""
             INSERT INTO serial_counter (fy, count)
