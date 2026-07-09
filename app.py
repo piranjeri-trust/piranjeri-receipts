@@ -517,3 +517,5 @@ if st.session_state.get("user") == "admin3":
                 st.success("✅ Neon PostgreSQL connected — database is live and permanent.")
             except Exception as e:
                 st.error(f"❌ Connection failed: {e}")
+                from whatsapp_ack import render_whatsapp_ack_section
+render_whatsapp_ack_section(donors, st.session_state["user"])
