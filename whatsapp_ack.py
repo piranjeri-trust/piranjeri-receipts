@@ -189,13 +189,16 @@ def render_whatsapp_ack_section(donors, current_user: str):
         purpose_display = (
             f"{ack_purpose} - {ack_note.strip()}" if ack_note.strip() else ack_purpose
         )
+        if ack_prasadham:
+            closing = "An e-receipt will be sent to you by WhatsApp and Prasadham will be sent by post."
+        else:
+            closing = "An e-receipt will be sent to you by WhatsApp."
+
         message_parts = [
             f"Dear {ack_donor_name},",
             f"thank you for your contribution of Rs. {ack_amount:,.2f} for {purpose_display}.",
-            "An e-receipt will be sent to you by WhatsApp upon receiving bank statement.",
+            closing,
         ]
-        if ack_prasadham:
-            message_parts.append("Prasadham will be sent by mail.")
 
         message_text = " ".join(message_parts)
 
