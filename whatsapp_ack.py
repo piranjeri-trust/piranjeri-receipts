@@ -19,10 +19,9 @@ PURPOSES = [
 ]
 
 
-# ── DB helpers (use same Neon connection from session_state) ──────────────
+# ── DB helpers ─────────────────────────────────────────────────────────────
 
 def _get_conn():
-    """Reuse existing Neon connection from session state."""
     if "neon_conn" not in st.session_state or st.session_state["neon_conn"] is None:
         dsn = st.secrets["neon"]["dsn"]
         conn = psycopg2.connect(dsn, cursor_factory=psycopg2.extras.RealDictCursor)
@@ -103,28 +102,43 @@ def _load_ack_log(search_mobile: str = "") -> list:
 # ── Main render function ───────────────────────────────────────────────────
 
 def render_whatsapp_ack_section(donors, current_user: str):
-    """
-    Call this at the bottom of app.py to render the WhatsApp
-    Acknowledgement section. Requires the donors DataFrame
-    already loaded by app.py and the logged-in username.
-    """
 
     st.divider()
     st.subheader("📲 WhatsApp Acknowledgement")
     st.caption(
-        "Select a donor, enter the amount and purpose they informed you about, "
-        "then generate a WhatsApp acknowledgement link to send them."
+        "Search by WhatsApp number to find the donor, select them, "
+        "enter the amount and purpose, then generate the acknowledgement link."
     )
 
-    # ── Donor dropdown ────────────────────────────────────────────
     if donors.empty:
         st.warning("No donors found. Add a donor in the section above first.")
+        return
+
+    # ── STEP 1: Search by WhatsApp number ────────────────────────
+    search_mobile = st.text_input(
+        "🔍 Search donor by WhatsApp number",
+        key="ack_search_mobile",
+        placeholder="Enter digits to filter donor list"
+    )
+
+    # Filter donor list based on search
+    if search_mobile.strip():
+        digits = "".join(c for c in search_mobile if c.isdigit())
+        filtered = donors[
+            donors["Mobile Number"].astype(str).str.contains(digits, na=False)
+        ]
+    else:
+        filtered = donors
+
+    # ── STEP 2: Select donor from (filtered) dropdown ─────────────
+    if filtered.empty:
+        st.warning("No donor found with that WhatsApp number.")
         return
 
     donor_options = [
         r["NAME"] if not r["Mobile Number"] or r["Mobile Number"] in ("", "nan")
         else f"{r['NAME']} - {r['Mobile Number']}"
-        for _, r in donors.iterrows()
+        for _, r in filtered.iterrows()
     ]
 
     ack_selected = st.selectbox(
@@ -134,13 +148,15 @@ def render_whatsapp_ack_section(donors, current_user: str):
     )
 
     if ack_selected == "-- Select donor --":
+        # Still show the log below even if no donor selected
+        _render_log()
         return
 
-    ack_index = donors.index[donor_options.index(ack_selected)]
-    ack_donor_name = donors.loc[ack_index, "NAME"]
-    ack_donor_mobile = str(donors.loc[ack_index, "Mobile Number"])
+    ack_index = filtered.index[donor_options.index(ack_selected)]
+    ack_donor_name = filtered.loc[ack_index, "NAME"]
+    ack_donor_mobile = str(filtered.loc[ack_index, "Mobile Number"])
 
-    # ── Form fields ───────────────────────────────────────────────
+    # ── STEP 3: Amount, Purpose, Note, Prasadham ─────────────────
     col1, col2 = st.columns(2)
     with col1:
         ack_amount = st.number_input(
@@ -162,14 +178,14 @@ def render_whatsapp_ack_section(donors, current_user: str):
             key="ack_prasadham"
         )
 
-    # ── Generate WhatsApp link ────────────────────────────────────
+    # ── STEP 4: Generate WhatsApp link ───────────────────────────
     if st.button("Generate WhatsApp Acknowledgement", type="primary", key="ack_generate"):
 
         if not ack_donor_mobile or ack_donor_mobile in ("", "nan"):
             st.error("This donor has no mobile number. Edit the donor above to add one.")
+            _render_log()
             return
 
-        # Build message
         purpose_display = (
             f"{ack_purpose} - {ack_note.strip()}" if ack_note.strip() else ack_purpose
         )
@@ -183,11 +199,9 @@ def render_whatsapp_ack_section(donors, current_user: str):
 
         message_text = " ".join(message_parts)
 
-        # WhatsApp link
         digits = "".join(c for c in ack_donor_mobile if c.isdigit())
         wa_url = f"https://wa.me/{digits}?text={urllib.parse.quote(message_text)}"
 
-        # Save to log
         try:
             _save_ack_log({
                 "donor_name": ack_donor_name,
@@ -202,9 +216,9 @@ def render_whatsapp_ack_section(donors, current_user: str):
             st.success(f"Acknowledgement ready for {ack_donor_name}")
         except Exception as e:
             st.error(f"Could not save to log: {e}")
+            _render_log()
             return
 
-        # Store in session so button stays visible after rerun
         st.session_state["ack_wa_url"] = wa_url
         st.session_state["ack_wa_name"] = ack_donor_name
         st.session_state["ack_message_preview"] = message_text
@@ -222,19 +236,24 @@ def render_whatsapp_ack_section(donors, current_user: str):
             st.rerun()
 
     # ── Acknowledgement Log ───────────────────────────────────────
+    _render_log()
+
+
+def _render_log():
     st.divider()
     st.subheader("📋 Acknowledgement Log")
+    st.caption("Chronological record of all acknowledgements sent.")
 
-    search_mob = st.text_input(
-        "Search by WhatsApp number",
+    log_search = st.text_input(
+        "Search log by WhatsApp number",
         key="ack_log_search",
         placeholder="Enter digits to filter"
     )
 
-    log = _load_ack_log(search_mob)
+    log = _load_ack_log(log_search)
 
     if not log:
-        st.info("No acknowledgements sent yet." if not search_mob.strip()
+        st.info("No acknowledgements sent yet." if not log_search.strip()
                 else "No records found for that number.")
     else:
         for entry in log:
