@@ -24,7 +24,7 @@ OUT_DIR.mkdir(exist_ok=True)
 PURPOSES = [
     "Nithya Pooja","Garuda Seva","Pradhosham","Sangabhishekam",
     "Panguni uthiram","Annadhanam","Kumbhabhishekam","Varushabhishekam",
-    "Temple Renovation","General Donation"
+    "Temple Renovation","General Donation","Bank Interest"
 ]
 COUNTRY_CODES = {
     "India (+91)":"91","Singapore (+65)":"65","Malaysia (+60)":"60",
