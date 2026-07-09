@@ -247,7 +247,7 @@ if selected is not None:
 
         wa_mobile = normalize_mobile(donor_mobile)
         wa_text   = (
-            f"\u0BA8\u0BAE\u0BB8\u0BCD\u0B95\u0BBE\u0BB0\u0BAE\u0BCD ! "
+            f"நமஸ்காரம் ! "
             f"{donor_name}, your donation receipt "
             f"({receipt_number}) from Piranjeri Temples Family Trust "
             f"is attached, thank you."
@@ -517,7 +517,6 @@ if st.session_state.get("user") == "admin3":
                 st.success("✅ Neon PostgreSQL connected — database is live and permanent.")
             except Exception as e:
                 st.error(f"❌ Connection failed: {e}")
-                    
-    
+
 from whatsapp_ack import render_whatsapp_ack_section
 render_whatsapp_ack_section(donors, st.session_state["user"])
