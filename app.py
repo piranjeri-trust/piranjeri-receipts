@@ -3,10 +3,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 import urllib.parse
-
 from receipt_core import generate_receipt_pdf
 import db
-
 # ---------------- LOGIN CONFIG ----------------
 USERS = {
     "esrivasan": "Password1",
@@ -14,13 +12,11 @@ USERS = {
     "admin3":    "Password3"
 }
 SESSION_TIMEOUT = 60  # minutes
-
 # ---------------- LOCAL PATHS (PDF only) ----------------
 BASE_DIR = Path(__file__).resolve().parent
 OUT_DIR  = BASE_DIR / "generated_receipts"
 OM_PATH  = BASE_DIR / "om_saffron.png"
 OUT_DIR.mkdir(exist_ok=True)
-
 PURPOSES = [
     "Nithya Pooja","Garuda Seva","Pradhosham","Sangabhishekam",
     "Panguni uthiram","Annadhanam","Kumbhabhishekam","Varushabhishekam",
@@ -30,7 +26,6 @@ COUNTRY_CODES = {
     "India (+91)":"91","Singapore (+65)":"65","Malaysia (+60)":"60",
     "UAE (+971)":"971","Oman (+968)":"968","UK (+44)":"44","USA (+1)":"1"
 }
-
 # ================================================================
 # LOGIN
 # ================================================================
@@ -46,7 +41,6 @@ def login():
             st.rerun()
         else:
             st.error("Invalid credentials")
-
 def check_session():
     if "login_time" in st.session_state:
         if datetime.now() - datetime.fromisoformat(st.session_state["login_time"]) \
@@ -54,17 +48,14 @@ def check_session():
             st.session_state.clear()
             st.warning("Session expired. Please login again.")
             st.rerun()
-
 # ================================================================
 # SERIAL (Neon)
 # ================================================================
 def get_serial(issue_date):
     fy = issue_date.year if issue_date.month >= 4 else issue_date.year - 1
     return db.next_serial_for_fy(str(fy))
-
 def reset_serial(fy, start_from):
     db.reset_serial_counter(str(fy), start_from)
-
 # ================================================================
 # DONORS (Neon)
 # ================================================================
@@ -79,50 +70,38 @@ def load_donors():
     except Exception as e:
         st.error(f"Could not load donors: {e}")
         return pd.DataFrame(columns=["NAME", "Mobile Number"])
-
 def add_donor(name, mobile):
     db.create_donor(name, mobile)
-
 def edit_donor(old_name, old_mobile, new_name, new_mobile):
     db.update_donor(old_name, old_mobile, new_name, new_mobile)
-
 def normalize_mobile(m):
     return "".join(c for c in str(m) if c.isdigit())
-
 # ================================================================
 # RECEIPTS (Neon)
 # ================================================================
 def save_receipt(record):
     db.save_receipt(record)
-
 def load_history():
     try:
         return db.load_history()
     except Exception as e:
         st.error(f"Could not load receipts: {e}")
         return []
-
 def cancel_receipt(serial, cancelled_by, reason):
     db.cancel_receipt(serial, cancelled_by, reason)
-
 # ================================================================
 # APP
 # ================================================================
 if "user" not in st.session_state:
     login()
     st.stop()
-
 check_session()
-
 st.title("Piranjeri Temple Receipt Generator")
 st.caption(f"Logged in as: {st.session_state['user']}")
-
 if st.button("Logout"):
     st.session_state.clear()
     st.rerun()
-
 donors = load_donors()
-
 # ── Select donor ──────────────────────────────────────────────────
 if donors.empty:
     st.warning("No donor found. Add one below.")
@@ -142,11 +121,9 @@ else:
         selected_index = None
     else:
         selected_index = donors.index[donor_options.index(selected)]
-
 # ── Add donor ─────────────────────────────────────────────────────
 if "add_donor_counter" not in st.session_state:
     st.session_state["add_donor_counter"] = 0
-
 with st.expander("Add New Donor"):
     counter     = st.session_state["add_donor_counter"]
     new_name    = st.text_input("New donor name", value="", key=f"new_donor_name_{counter}")
@@ -169,8 +146,8 @@ with st.expander("Add New Donor"):
                 add_donor(nm, mm)
                 st.success(f"✅ New donor '{nm}' added successfully.")
                 st.session_state["add_donor_counter"] += 1
+                st.session_state["ack_prefill_mobile"] = mm
                 st.rerun()
-
 # ── Edit donor ────────────────────────────────────────────────────
 if selected is not None:
     with st.expander("Edit Selected Donor"):
@@ -197,12 +174,10 @@ if selected is not None:
                 edit_donor(cur_name, cur_mobile, en, em)
                 st.success("Donor updated.")
                 st.rerun()
-
 # ── Receipt form ──────────────────────────────────────────────────
 if selected is not None:
     donor_name   = donors.loc[selected_index, "NAME"]
     donor_mobile = str(donors.loc[selected_index, "Mobile Number"])
-
     c1, c2 = st.columns(2)
     with c1:
         amount         = st.number_input("Amount received (Rs.)", min_value=1.0, step=1.0, format="%.2f")
@@ -212,17 +187,14 @@ if selected is not None:
         issue_date    = st.date_input("Receipt issue date", value=datetime.today())
         purpose       = st.selectbox("Purpose", PURPOSES)
         optional_note = st.text_input("Optional note")
-
     cheque_number = ""
     if payment_method == "cheque":
         cheque_number = st.text_input("Cheque number")
-
     if st.button("Generate Receipt", type="primary"):
         final_purpose  = f"{purpose} - {optional_note.strip()}" if optional_note.strip() else purpose
         receipt_number = get_serial(issue_date)
         safe_name      = "".join(c for c in donor_name if c.isalnum() or c in " _-").strip().replace(" ", "_")
         out_file       = OUT_DIR / f"{receipt_number.replace('/','_')}_{safe_name}.pdf"
-
         generate_receipt_pdf(
             output_path=out_file, donor_name=donor_name, donor_mobile=donor_mobile,
             amount=float(amount), credit_date=credit_date.strftime("%Y-%m-%d"),
@@ -231,7 +203,6 @@ if selected is not None:
             payment_method=payment_method, cheque_number=cheque_number,
             receipt_number_override=receipt_number,
         )
-
         save_receipt({
             "serial": receipt_number, "name": donor_name, "mobile": donor_mobile,
             "amount": float(amount), "purpose": final_purpose, "payment": payment_method,
@@ -239,12 +210,10 @@ if selected is not None:
             "credit_date": credit_date.strftime("%Y-%m-%d"), "user": st.session_state["user"],
             "pdf_file": out_file.name,
         })
-
         st.success(f"Receipt generated: {receipt_number}")
         with open(out_file, "rb") as f:
             st.session_state["receipt_bytes"] = f.read()
         st.session_state["receipt_filename"] = out_file.name
-
         wa_mobile = normalize_mobile(donor_mobile)
         wa_text   = (
             f"நமஸ்காரம் ! "
@@ -255,7 +224,6 @@ if selected is not None:
         st.session_state["receipt_whatsapp_url"] = (
             f"https://wa.me/{wa_mobile}?text={urllib.parse.quote(wa_text)}"
         )
-
     if st.session_state.get("receipt_bytes"):
         st.download_button(
             "⬇️ Download PDF",
@@ -266,11 +234,9 @@ if selected is not None:
         )
         if st.session_state.get("receipt_whatsapp_url"):
             st.link_button("📲 Send via WhatsApp", st.session_state["receipt_whatsapp_url"])
-
 # ── Receipt history ───────────────────────────────────────────────
 st.subheader("Receipt History")
 history = load_history()
-
 if not history:
     st.info("No receipts generated yet.")
 else:
@@ -280,7 +246,6 @@ else:
         try:    key = datetime.strptime(h["issue_date"], "%Y-%m-%d").strftime("%B %Y")
         except: key = "Unknown"
         grouped[key].append(h)
-
     for month_label in sorted(grouped.keys(), reverse=True):
         entries = grouped[month_label]
         with st.expander(f"📁 {month_label}  ({len(entries)} receipts)"):
@@ -294,7 +259,6 @@ else:
                 else:
                     st.write(f"{h['serial']} | {h['name']} | Rs.{h['amount']} | "
                              f"{h['purpose']} | {h['payment']} | {h.get('user', '')}")
-
 # ── Reprint / Cancel ──────────────────────────────────────────────
 st.subheader("Reprint / Cancel Receipt")
 sc1, sc2, sc3 = st.columns(3)
@@ -303,7 +267,6 @@ with sc2: smb = st.text_input("Search by Mobile Number")
 with sc3:
     date_on = st.checkbox("Filter by Issue Date")
     sdt     = st.date_input("Select Issue Date", value=datetime.today()) if date_on else None
-
 fh = history
 if srn.strip(): fh = [h for h in fh if srn.strip().lower() in str(h.get("serial", "")).lower()]
 if smb.strip():
@@ -312,7 +275,6 @@ if smb.strip():
 if sdt:
     iq = sdt.strftime("%Y-%m-%d")
     fh = [h for h in fh if str(h.get("issue_date", "")) == iq]
-
 if srn.strip() or smb.strip() or date_on:
     if fh:
         for i, h in enumerate(fh[::-1]):
@@ -345,7 +307,6 @@ if srn.strip() or smb.strip() or date_on:
                 with b2:
                     if st.button("❌ Cancel", key=f"cx_{i}_{h['serial']}"):
                         st.session_state[f"cc_{h['serial']}"] = True
-
             if st.session_state.get(f"cc_{h['serial']}", False):
                 st.warning(f"Cancel {h['serial']} — {h['name']} — Rs.{h['amount']}?")
                 cr = st.text_input("Reason (required)", key=f"cr_{h['serial']}")
@@ -373,7 +334,6 @@ if srn.strip() or smb.strip() or date_on:
                     if st.button("No, go back", key=f"ccn_{h['serial']}"):
                         st.session_state.pop(f"cc_{h['serial']}", None)
                         st.rerun()
-
             if st.session_state.get(f"cfile_{h['serial']}"):
                 cf = Path(st.session_state[f"cfile_{h['serial']}"])
                 if cf.exists():
@@ -383,41 +343,32 @@ if srn.strip() or smb.strip() or date_on:
                                            key=f"dlcf_{h['serial']}")
     else:
         st.warning("No matching receipt found.")
-
 # ── Collections report ────────────────────────────────────────────
 st.subheader("📊 Collections Report")
-
 if not history:
     st.info("No receipts yet.")
 else:
     from collections import defaultdict
     from generate_report import generate_collections_report
-
     active_h    = [h for h in history if h.get("status", "ACTIVE") != "CANCELLED"]
     cancelled_h = [h for h in history if h.get("status", "ACTIVE") == "CANCELLED"]
-
     all_months = sorted(set(
         datetime.strptime(h["issue_date"], "%Y-%m-%d").strftime("%B %Y")
         for h in history if h.get("issue_date")
     ), reverse=True)
-
     if all_months:
         sel_month = st.selectbox("Select month to generate report", all_months)
-
         m_active    = [h for h in active_h
                        if datetime.strptime(h["issue_date"], "%Y-%m-%d").strftime("%B %Y") == sel_month]
         m_cancelled = [h for h in cancelled_h
                        if datetime.strptime(h["issue_date"], "%Y-%m-%d").strftime("%B %Y") == sel_month]
-
         t_active    = sum(float(h["amount"]) for h in m_active)
         t_cancelled = sum(float(h["amount"]) for h in m_cancelled)
-
         m1, m2, m3, m4 = st.columns(4)
         m1.metric("Active Receipts",    len(m_active))
         m2.metric("Total Collected",    f"Rs. {t_active:,.2f}")
         m3.metric("Cancelled Receipts", len(m_cancelled))
         m4.metric("Cancelled Amount",   f"Rs. {t_cancelled:,.2f}")
-
         if st.button("📥 Generate & Download Excel Report", type="primary"):
             REPORTS_DIR = BASE_DIR / "reports"
             REPORTS_DIR.mkdir(exist_ok=True)
@@ -432,7 +383,6 @@ else:
             st.session_state["report_month"]           = sel_month
             st.session_state["report_count"]           = len(m_active)
             st.session_state["report_cancelled_count"] = len(m_cancelled)
-
         if st.session_state.get("report_bytes"):
             st.download_button(
                 f"⬇️ Download {st.session_state['report_month']} Report",
@@ -446,45 +396,37 @@ else:
                 f"{st.session_state.get('report_cancelled_count', 0)} cancelled — "
                 f"{st.session_state['report_month']}"
             )
-
     # ── Full Year Report ──────────────────────────────────────────
     st.divider()
     st.subheader("📅 Full Year Report")
-
     available_years = sorted(set(
         datetime.strptime(h["issue_date"], "%Y-%m-%d").year
         for h in history if h.get("issue_date")
     ), reverse=True)
-
     if available_years:
         selected_fy = st.selectbox(
             "Select year for full report",
             available_years,
             format_func=lambda y: f"{y}"
         )
-
         if st.button("📥 Generate Full Year Report", type="primary"):
             year_history = [
                 h for h in history
                 if datetime.strptime(h["issue_date"], "%Y-%m-%d").year == selected_fy
             ]
-
             REPORTS_DIR = BASE_DIR / "reports"
             REPORTS_DIR.mkdir(exist_ok=True)
             annual_file = REPORTS_DIR / f"Annual_Report_{selected_fy}.xlsx"
-
             from generate_report import generate_annual_report
             generate_annual_report(
                 all_history=year_history,
                 financial_year=selected_fy,
                 output_path=annual_file,
             )
-
             with open(annual_file, "rb") as f:
                 st.session_state["annual_bytes"] = f.read()
             st.session_state["annual_filename"] = annual_file.name
             st.session_state["annual_year"]     = selected_fy
-
         if st.session_state.get("annual_bytes"):
             st.download_button(
                 f"⬇️ Download Full Year {st.session_state['annual_year']} Report",
@@ -497,11 +439,9 @@ else:
                 f"✅ Full year {st.session_state['annual_year']} report ready — "
                 f"one sheet per month + Summary + Cancelled sheets"
             )
-
 # ── Admin panel ───────────────────────────────────────────────────
 if st.session_state.get("user") == "admin3":
     st.subheader("🔧 Admin Panel")
-
     with st.expander("Reset Serial Counter"):
         st.warning("⚠️ Only reset at start of new financial year or if counter is wrong.")
         ry = st.number_input("Financial Year", value=datetime.now().year, step=1, format="%d")
@@ -509,7 +449,6 @@ if st.session_state.get("user") == "admin3":
         if st.button("Reset Counter", type="primary"):
             reset_serial(int(ry), int(rc))
             st.success(f"✅ Counter reset. Next receipt: {int(rc)+1:03d}/{int(ry)}")
-
     with st.expander("🔍 Database Connection Test"):
         if st.button("Test Neon connection"):
             try:
@@ -517,6 +456,5 @@ if st.session_state.get("user") == "admin3":
                 st.success("✅ Neon PostgreSQL connected — database is live and permanent.")
             except Exception as e:
                 st.error(f"❌ Connection failed: {e}")
-
 from whatsapp_ack import render_whatsapp_ack_section
 render_whatsapp_ack_section(donors, st.session_state["user"])
