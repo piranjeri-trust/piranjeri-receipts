@@ -95,6 +95,20 @@ def _load_ack_log(search_mobile: str = "") -> list:
         return []
 
 
+def _delete_ack_log(entry_id: int):
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM whatsapp_ack_log WHERE id = %s", (entry_id,))
+        conn.commit()
+    except Exception:
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
+
+
 # Main render function
 def render_whatsapp_ack_section(donors, current_user: str):
     st.divider()
@@ -110,7 +124,15 @@ def render_whatsapp_ack_section(donors, current_user: str):
     # Counter-based reset (same pattern as add_donor_counter in app.py)
     if "ack_form_counter" not in st.session_state:
         st.session_state["ack_form_counter"] = 0
-    fc = st.session_state["ack_form_counter"]
+
+    # If a new donor was just added in app.py, pre-fill search with their mobile
+    if "ack_prefill_mobile" in st.session_state:
+        prefill_mobile = st.session_state.pop("ack_prefill_mobile")
+        st.session_state["ack_form_counter"] += 1
+        fc = st.session_state["ack_form_counter"]
+        st.session_state[f"ack_search_mobile_{fc}"] = prefill_mobile
+    else:
+        fc = st.session_state["ack_form_counter"]
 
     # STEP 1: Search by WhatsApp number
     search_mobile = st.text_input(
@@ -143,7 +165,7 @@ def render_whatsapp_ack_section(donors, current_user: str):
         key=f"ack_donor_select_{fc}"
     )
     if ack_selected == "-- Select donor --":
-        _render_log()
+        _render_log(current_user)
         return
 
     ack_index = filtered.index[donor_options.index(ack_selected)]
@@ -167,8 +189,9 @@ def render_whatsapp_ack_section(donors, current_user: str):
             "Optional note",
             key=f"ack_note_{fc}"
         )
+        # CHANGE 1: "by mail" -> "by post"
         ack_prasadham = st.checkbox(
-            "Prasadham will be sent by mail",
+            "Prasadham will be sent by post",
             key=f"ack_prasadham_{fc}"
         )
 
@@ -176,7 +199,7 @@ def render_whatsapp_ack_section(donors, current_user: str):
     if st.button("Generate WhatsApp Acknowledgement", type="primary", key=f"ack_generate_{fc}"):
         if not ack_donor_mobile or ack_donor_mobile in ("", "nan"):
             st.error("This donor has no mobile number. Edit the donor above to add one.")
-            _render_log()
+            _render_log(current_user)
             return
 
         purpose_display = (
@@ -210,7 +233,7 @@ def render_whatsapp_ack_section(donors, current_user: str):
             st.success(f"Acknowledgement ready for {ack_donor_name}")
         except Exception as e:
             st.error(f"Could not save to log: {e}")
-            _render_log()
+            _render_log(current_user)
             return
 
         st.session_state["ack_wa_url"] = wa_url
@@ -231,10 +254,10 @@ def render_whatsapp_ack_section(donors, current_user: str):
             st.session_state["ack_form_counter"] += 1
             st.rerun()
 
-    _render_log()
+    _render_log(current_user)
 
 
-def _render_log():
+def _render_log(current_user: str = ""):
     st.divider()
     st.subheader("📋 Acknowledgement Log")
     st.caption("Chronological record of all acknowledgements sent.")
@@ -247,16 +270,44 @@ def _render_log():
     if not log:
         st.info("No acknowledgements sent yet." if not log_search.strip()
                 else "No records found for that number.")
-    else:
-        for entry in log:
-            sent_at = entry.get("sent_at", "")
-            try:
-                sent_at_fmt = datetime.fromisoformat(str(sent_at)).strftime("%d %b %Y %H:%M")
-            except Exception:
-                sent_at_fmt = str(sent_at)
-            prasadham_tag = " | 📦 Prasadham" if entry.get("prasadham") else ""
+        return
+
+    for entry in log:
+        sent_at = entry.get("sent_at", "")
+        try:
+            sent_at_fmt = datetime.fromisoformat(str(sent_at)).strftime("%d %b %Y %H:%M")
+        except Exception:
+            sent_at_fmt = str(sent_at)
+        prasadham_tag = " | 📦 Prasadham" if entry.get("prasadham") else ""
+        entry_id = entry.get("id")
+
+        col_text, col_btn = st.columns([9, 1])
+        with col_text:
             st.write(
                 f"**{sent_at_fmt}** | {entry['donor_name']} | "
                 f"Rs. {float(entry['amount']):,.2f} | {entry['purpose']} | "
                 f"Sent by: {entry['sent_by']}{prasadham_tag}"
             )
+        with col_btn:
+            if st.button("🗑️", key=f"del_{entry_id}", help="Delete this entry"):
+                st.session_state[f"confirm_del_{entry_id}"] = True
+
+        # Confirmation row
+        if st.session_state.get(f"confirm_del_{entry_id}", False):
+            st.warning(
+                f"Delete acknowledgement for **{entry['donor_name']}** "
+                f"(Rs. {float(entry['amount']):,.2f})?"
+            )
+            cy, cn = st.columns(2)
+            with cy:
+                if st.button("Yes, delete", key=f"yes_del_{entry_id}", type="primary"):
+                    try:
+                        _delete_ack_log(entry_id)
+                        st.session_state.pop(f"confirm_del_{entry_id}", None)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Could not delete: {e}")
+            with cn:
+                if st.button("Cancel", key=f"no_del_{entry_id}"):
+                    st.session_state.pop(f"confirm_del_{entry_id}", None)
+                    st.rerun()
